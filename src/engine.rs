@@ -2321,11 +2321,6 @@ pub fn create_kdp_document(title: Option<&str>) -> Docx {
         .add_style(figure_caption)
         .add_style(pull_quote);
 
-    // Add linked TOC support
-    doc = doc.add_table_of_contents(
-        TableOfContents::new().heading_styles_range(1, 3).hyperlink()
-    );
-
     if let Some(t) = title {
         doc = doc.custom_property("title", t);
     }
@@ -2334,6 +2329,21 @@ pub fn create_kdp_document(title: Option<&str>) -> Docx {
 }
 
 /// Insert a code block (monospace, preserves whitespace, each line as separate paragraph).
+/// Insert a linked Table of Contents at the given position.
+pub fn insert_toc(docx: &mut Docx, index: usize) -> Result<usize, DocxMcpError> {
+    let count = count_body_children(docx);
+    if index > count {
+        return Err(DocxMcpError::IndexOutOfBounds {
+            message: "Insert TOC index out of bounds".into(),
+            index,
+            max: count,
+        });
+    }
+    let toc = TableOfContents::new().heading_styles_range(1, 3).hyperlink();
+    docx.document.children.insert(index, DocumentChild::TableOfContents(Box::new(toc)));
+    Ok(index)
+}
+
 pub fn insert_code_block(
     docx: &mut Docx,
     index: usize,

@@ -316,6 +316,18 @@ impl DocxMcpServer {
         }
     }
 
+    #[tool(name = "add_toc", description = "Insert a linked Table of Contents at the given position. Generates from Heading1-3 styles.")]
+    async fn add_toc_at(&self, Parameters(input): Parameters<InsertTocInput>) -> String {
+        let mut store = self.store.lock().await;
+        match store.get_mut(&input.document_handle) {
+            Ok(entry) => match crate::engine::insert_toc(&mut entry.data, input.index) {
+                Ok(idx) => serde_json::json!({"success":true,"data":{"index":idx},"error":null}).to_string(),
+                Err(e) => serde_json::json!({"success":false,"data":null,"error":e.to_string()}).to_string(),
+            },
+            Err(e) => serde_json::json!({"success":false,"data":null,"error":e.to_string()}).to_string(),
+        }
+    }
+
     #[tool(name = "insert_code_block", description = "Insert a monospace code block (Courier New 9pt, preserves whitespace). For KDP technical books.")]
     async fn insert_code_block(&self, Parameters(input): Parameters<InsertCodeBlockInput>) -> String {
         let mut store = self.store.lock().await;

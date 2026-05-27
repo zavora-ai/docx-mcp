@@ -267,3 +267,9 @@ pub struct InsertCalloutInput {
     pub callout_type: String,
     pub text: String,
 }
+
+#[derive(Deserialize, JsonSchema)]
+pub struct InsertTocInput {
+    pub document_handle: String,
+    pub index: usize,
+}
