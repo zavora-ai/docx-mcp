@@ -2273,9 +2273,145 @@ pub fn create_kdp_document(title: Option<&str>) -> Docx {
         .add_style(author)
         .add_style(copyright);
 
+    // Technical book styles
+    let code_block = Style::new("CodeBlock", StyleType::Paragraph)
+        .name("Code Block")
+        .size(18) // 9pt
+        .fonts(docx_rs::RunFonts::new().ascii("Courier New").hi_ansi("Courier New"))
+        .line_spacing(LineSpacing::new().line(240).line_rule(LineSpacingType::Auto));
+
+    let callout_tip = Style::new("CalloutTip", StyleType::Paragraph)
+        .name("Callout Tip")
+        .size(20) // 10pt
+        .fonts(docx_rs::RunFonts::new().ascii(font).hi_ansi(font))
+        .indent(Some(432), None, None, None); // 0.3" left indent
+
+    let callout_warning = Style::new("CalloutWarning", StyleType::Paragraph)
+        .name("Callout Warning")
+        .size(20)
+        .fonts(docx_rs::RunFonts::new().ascii(font).hi_ansi(font))
+        .indent(Some(432), None, None, None);
+
+    let callout_note = Style::new("CalloutNote", StyleType::Paragraph)
+        .name("Callout Note")
+        .size(20)
+        .fonts(docx_rs::RunFonts::new().ascii(font).hi_ansi(font))
+        .indent(Some(432), None, None, None);
+
+    let figure_caption = Style::new("FigureCaption", StyleType::Paragraph)
+        .name("Figure Caption")
+        .size(18) // 9pt
+        .italic()
+        .fonts(docx_rs::RunFonts::new().ascii(font).hi_ansi(font))
+        .align(AlignmentType::Center);
+
+    let pull_quote = Style::new("PullQuote", StyleType::Paragraph)
+        .name("Pull Quote")
+        .size(24) // 12pt
+        .italic()
+        .fonts(docx_rs::RunFonts::new().ascii(font).hi_ansi(font))
+        .indent(Some(720), None, Some(720), None) // 0.5" both sides
+        .line_spacing(LineSpacing::new().before(240).after(240));
+
+    doc = doc
+        .add_style(code_block)
+        .add_style(callout_tip)
+        .add_style(callout_warning)
+        .add_style(callout_note)
+        .add_style(figure_caption)
+        .add_style(pull_quote);
+
+    // Add linked TOC support
+    doc = doc.add_table_of_contents(
+        TableOfContents::new().heading_styles_range(1, 3).hyperlink()
+    );
+
     if let Some(t) = title {
         doc = doc.custom_property("title", t);
     }
 
     doc
+}
+
+/// Insert a code block (monospace, preserves whitespace, each line as separate paragraph).
+pub fn insert_code_block(
+    docx: &mut Docx,
+    index: usize,
+    code: &str,
+    _language: Option<&str>,
+) -> Result<usize, DocxMcpError> {
+    let count = count_body_children(docx);
+    if index > count {
+        return Err(DocxMcpError::IndexOutOfBounds {
+            message: "Insert code block index out of bounds".into(),
+            index,
+            max: count,
+        });
+    }
+
+    let lines: Vec<&str> = code.lines().collect();
+    let num_lines = lines.len();
+
+    // Insert lines in reverse so they end up in correct order at `index`
+    for line in lines.into_iter().rev() {
+        let run = Run::new()
+            .add_text(line)
+            .size(18)
+            .fonts(RunFonts::new().ascii("Courier New").hi_ansi("Courier New"));
+        let para = Paragraph::new()
+            .style("CodeBlock")
+            .add_run(run)
+            .line_spacing(LineSpacing::new().line(240).line_rule(LineSpacingType::Auto));
+        docx.document
+            .children
+            .insert(index, DocumentChild::Paragraph(Box::new(para)));
+    }
+
+    Ok(num_lines)
+}
+
+/// Insert a callout box (tip, warning, or note) with prefix label.
+pub fn insert_callout(
+    docx: &mut Docx,
+    index: usize,
+    callout_type: &str,
+    text: &str,
+) -> Result<usize, DocxMcpError> {
+    let count = count_body_children(docx);
+    if index > count {
+        return Err(DocxMcpError::IndexOutOfBounds {
+            message: "Insert callout index out of bounds".into(),
+            index,
+            max: count,
+        });
+    }
+
+    let (prefix, style_name) = match callout_type {
+        "warning" => ("⚠ WARNING: ", "CalloutWarning"),
+        "note" => ("📝 NOTE: ", "CalloutNote"),
+        _ => ("💡 TIP: ", "CalloutTip"),
+    };
+
+    let font = "Garamond";
+    let prefix_run = Run::new()
+        .add_text(prefix)
+        .bold()
+        .size(20)
+        .fonts(RunFonts::new().ascii(font).hi_ansi(font));
+    let text_run = Run::new()
+        .add_text(text)
+        .size(20)
+        .fonts(RunFonts::new().ascii(font).hi_ansi(font));
+
+    let para = Paragraph::new()
+        .style(style_name)
+        .add_run(prefix_run)
+        .add_run(text_run)
+        .indent(Some(432), None, None, None);
+
+    docx.document
+        .children
+        .insert(index, DocumentChild::Paragraph(Box::new(para)));
+
+    Ok(index)
 }

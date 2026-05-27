@@ -315,6 +315,30 @@ impl DocxMcpServer {
                 .unwrap_or_else(|e| format!("{{\"error\":\"{e}\"}}")),
         }
     }
+
+    #[tool(name = "insert_code_block", description = "Insert a monospace code block (Courier New 9pt, preserves whitespace). For KDP technical books.")]
+    async fn insert_code_block(&self, Parameters(input): Parameters<InsertCodeBlockInput>) -> String {
+        let mut store = self.store.lock().await;
+        match store.get_mut(&input.document_handle) {
+            Ok(entry) => match crate::engine::insert_code_block(&mut entry.data, input.index, &input.code, input.language.as_deref()) {
+                Ok(lines) => serde_json::json!({"success":true,"data":{"lines_inserted":lines},"error":null}).to_string(),
+                Err(e) => serde_json::json!({"success":false,"data":null,"error":e.to_string()}).to_string(),
+            },
+            Err(e) => serde_json::json!({"success":false,"data":null,"error":e.to_string()}).to_string(),
+        }
+    }
+
+    #[tool(name = "insert_callout", description = "Insert a callout box (tip/warning/note) with icon prefix. For KDP technical books.")]
+    async fn insert_callout(&self, Parameters(input): Parameters<InsertCalloutInput>) -> String {
+        let mut store = self.store.lock().await;
+        match store.get_mut(&input.document_handle) {
+            Ok(entry) => match crate::engine::insert_callout(&mut entry.data, input.index, &input.callout_type, &input.text) {
+                Ok(idx) => serde_json::json!({"success":true,"data":{"index":idx},"error":null}).to_string(),
+                Err(e) => serde_json::json!({"success":false,"data":null,"error":e.to_string()}).to_string(),
+            },
+            Err(e) => serde_json::json!({"success":false,"data":null,"error":e.to_string()}).to_string(),
+        }
+    }
 }
 
 #[tool_handler]

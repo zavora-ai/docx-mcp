@@ -249,3 +249,21 @@ pub struct SetHeaderFooterInput {
 pub struct ExportInput {
     pub document_handle: String,
 }
+
+#[derive(Deserialize, JsonSchema)]
+pub struct InsertCodeBlockInput {
+    pub document_handle: String,
+    pub index: usize,
+    pub code: String,
+    /// Optional language hint (e.g., "rust", "python")
+    pub language: Option<String>,
+}
+
+#[derive(Deserialize, JsonSchema)]
+pub struct InsertCalloutInput {
+    pub document_handle: String,
+    pub index: usize,
+    /// "tip", "warning", or "note"
+    pub callout_type: String,
+    pub text: String,
+}
