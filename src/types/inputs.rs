@@ -70,6 +70,8 @@ pub struct InsertParagraphInput {
     pub text: Option<String>,
     pub heading_level: Option<HeadingLevel>,
     pub style: Option<String>,
+    /// If true, starts a new page before this paragraph
+    pub page_break_before: Option<bool>,
 }
 
 #[derive(Deserialize, JsonSchema)]

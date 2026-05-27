@@ -25,6 +25,7 @@ pub async fn insert_paragraph(
         input.text.as_deref(),
         input.heading_level,
         input.style.as_deref(),
+        input.page_break_before.unwrap_or(false),
     )?;
     Ok(ToolResponse::success(InsertResult {
         index,

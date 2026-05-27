@@ -503,6 +503,7 @@ pub fn insert_paragraph(
     text: Option<&str>,
     heading: Option<HeadingLevel>,
     style: Option<&str>,
+    page_break_before: bool,
 ) -> Result<usize, DocxMcpError> {
     let count = count_body_children(docx);
     if index > count {
@@ -559,6 +560,10 @@ pub fn insert_paragraph(
             para = para.indent(None, Some(SpecialIndentType::FirstLine(432)), None, None);
         }
         _ => {}
+    }
+
+    if page_break_before {
+        para = para.page_break_before(true);
     }
 
     docx.document
@@ -802,6 +807,7 @@ pub fn batch_write(
                     input.text.as_deref(),
                     input.heading_level,
                     input.style.as_deref(),
+                    input.page_break_before.unwrap_or(false),
                 )
                 .map(|_| ())
             }
