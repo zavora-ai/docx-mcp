@@ -12,7 +12,10 @@ pub async fn create_document(
     store: &Arc<Mutex<DocumentStore>>,
     input: CreateDocumentInput,
 ) -> Result<ToolResponse<DocumentInfo>, DocxMcpError> {
-    let doc = engine::create_document(input.title.as_deref());
+    let doc = match input.format.as_deref() {
+        Some("kdp") => engine::create_kdp_document(input.title.as_deref()),
+        _ => engine::create_document(input.title.as_deref()),
+    };
     let mut store = store.lock().await;
     let handle = store.insert(doc, None);
     Ok(ToolResponse::success(DocumentInfo {

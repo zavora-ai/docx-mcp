@@ -39,7 +39,7 @@ impl Default for DocxMcpServer {
 impl DocxMcpServer {
     // ── Document lifecycle tools ────────────────────────────────────
 
-    #[tool(name = "create_document", description = "Create a new empty DOCX document in memory")]
+    #[tool(name = "create_document", description = "Create a new DOCX document. Set format='kdp' for Amazon KDP 6x9 book formatting (Garamond font, proper margins, page numbers, chapter styles)")]
     async fn create_document(&self, Parameters(input): Parameters<CreateDocumentInput>) -> String {
         match crate::tools::document::create_document(&self.store, input).await {
             Ok(resp) => serde_json::to_string(&resp).unwrap_or_else(|e| format!("{{\"error\":\"{e}\"}}")),

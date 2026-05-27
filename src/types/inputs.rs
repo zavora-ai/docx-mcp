@@ -8,6 +8,8 @@ use super::enums::*;
 #[derive(Deserialize, JsonSchema)]
 pub struct CreateDocumentInput {
     pub title: Option<String>,
+    /// Optional format preset: "kdp" for Amazon KDP 6x9 book formatting (Garamond, proper margins, page numbers, heading styles)
+    pub format: Option<String>,
 }
 
 #[derive(Deserialize, JsonSchema)]

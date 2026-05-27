@@ -11,10 +11,31 @@ use crate::error::DocxMcpError;
 /// Note: docx-rs v0.4 does not expose a public API for setting the core
 /// `dc:title` property, so we store the title as a custom document property.
 pub fn create_document(title: Option<&str>) -> Docx {
+    use docx_rs::{Style, StyleType, RunFonts};
+
     let mut doc = Docx::new();
     if let Some(t) = title {
         doc = doc.custom_property("title", t);
     }
+
+    // Add built-in heading styles so Word renders them correctly
+    let headings: &[(&str, &str, usize)] = &[
+        ("Heading1", "heading 1", 48),
+        ("Heading2", "heading 2", 36),
+        ("Heading3", "heading 3", 28),
+        ("Heading4", "heading 4", 24),
+        ("Heading5", "heading 5", 22),
+        ("Heading6", "heading 6", 20),
+    ];
+    for &(id, name, size) in headings {
+        let style = Style::new(id, StyleType::Paragraph)
+            .name(name)
+            .bold()
+            .size(size)
+            .fonts(RunFonts::new().ascii("Calibri").hi_ansi("Calibri"));
+        doc = doc.add_style(style);
+    }
+
     doc
 }
 
@@ -494,9 +515,29 @@ pub fn insert_paragraph(
 
     let mut para = Paragraph::new();
 
-    // Add text as a single run if provided
+    // Determine run formatting based on style
+    let effective_style = style.or_else(|| heading.as_ref().map(|h| heading_level_to_style(h)));
+    let mut run = Run::new();
     if let Some(t) = text {
-        para = para.add_run(Run::new().add_text(t));
+        run = run.add_text(t);
+    }
+
+    // Apply run-level font/size for known styles (ensures Word renders correctly)
+    match effective_style {
+        Some("Heading1") => { run = run.bold().size(48).fonts(RunFonts::new().ascii("Garamond").hi_ansi("Garamond")); }
+        Some("Heading2") => { run = run.bold().size(28).fonts(RunFonts::new().ascii("Garamond").hi_ansi("Garamond")); }
+        Some("Heading3") => { run = run.bold().size(24).fonts(RunFonts::new().ascii("Garamond").hi_ansi("Garamond")); }
+        Some("TitlePage") => { run = run.bold().size(56).fonts(RunFonts::new().ascii("Garamond").hi_ansi("Garamond")); }
+        Some("Subtitle") => { run = run.italic().size(28).fonts(RunFonts::new().ascii("Garamond").hi_ansi("Garamond")); }
+        Some("Author") => { run = run.size(28).fonts(RunFonts::new().ascii("Garamond").hi_ansi("Garamond")); }
+        Some("Copyright") => { run = run.size(18).fonts(RunFonts::new().ascii("Garamond").hi_ansi("Garamond")); }
+        Some("ChapterNum") => { run = run.size(24).fonts(RunFonts::new().ascii("Garamond").hi_ansi("Garamond")); }
+        Some("BodyText") | Some("BodyTextIndent") => { run = run.size(22).fonts(RunFonts::new().ascii("Garamond").hi_ansi("Garamond")); }
+        _ => {}
+    }
+
+    if text.is_some() {
+        para = para.add_run(run);
     }
 
     // Apply heading style
@@ -504,9 +545,20 @@ pub fn insert_paragraph(
         para = para.style(heading_level_to_style(h));
     }
 
-    // Apply named style (overrides heading if both provided, but heading takes precedence per design)
+    // Apply named style
     if let Some(s) = style {
         para = para.style(s);
+    }
+
+    // Apply paragraph-level formatting for known styles
+    match effective_style {
+        Some("Heading1") | Some("TitlePage") | Some("Subtitle") | Some("Author") | Some("ChapterNum") => {
+            para = para.align(AlignmentType::Center);
+        }
+        Some("BodyTextIndent") => {
+            para = para.indent(None, Some(SpecialIndentType::FirstLine(432)), None, None);
+        }
+        _ => {}
     }
 
     docx.document
@@ -1569,12 +1621,11 @@ pub fn add_section_break(
     let mut sec_prop = SectionProperty::new();
     sec_prop.section_type = Some(section_type);
 
-    // Apply optional page size
-    if let Some((w, h)) = page_size {
-        sec_prop = sec_prop.page_size(PageSize::new().size(w, h));
-    }
+    // Apply page size — default to KDP 6x9 if not specified
+    let (w, h) = page_size.unwrap_or((KDP_PAGE_W, KDP_PAGE_H));
+    sec_prop = sec_prop.page_size(PageSize::new().size(w, h));
 
-    // Apply optional margins (top, bottom, left, right)
+    // Apply margins — default to KDP margins if not specified
     if let Some((top, bottom, left, right)) = margins {
         let mut margin = PageMargin::new();
         if let Some(t) = top {
@@ -1590,6 +1641,11 @@ pub fn add_section_break(
             margin = margin.right(r as i32);
         }
         sec_prop = sec_prop.page_margin(margin);
+    } else {
+        // Default KDP margins
+        sec_prop = sec_prop.page_margin(
+            PageMargin::new().top(1080).bottom(1080).left(1260).right(1080).header(720).footer(720)
+        );
     }
 
     // Insert a paragraph with the section property attached.
@@ -2082,4 +2138,138 @@ pub fn to_html(docx: &Docx) -> String {
     }
 
     output
+}
+
+// ── KDP Book Creation ──────────────────────────────────────────────
+
+use docx_rs::{
+    AlignmentType, FieldCharType, InstrText, LineSpacingType,
+    Style, StyleType, TableOfContents,
+};
+
+/// KDP 6x9 page setup constants (in twips: 1 inch = 1440)
+const KDP_PAGE_W: u32 = 8640;   // 6"
+const KDP_PAGE_H: u32 = 12960;  // 9"
+
+/// Create a new document pre-configured for Amazon KDP 6x9 formatting.
+/// Includes page size, margins, Garamond font, line spacing, heading styles,
+/// page numbers in footer, and proper indent styles.
+pub fn create_kdp_document(title: Option<&str>) -> Docx {
+    let margin = PageMargin {
+        top: 1080,    // 0.75"
+        bottom: 1080, // 0.75"
+        left: 1260,   // 0.875" (inside/gutter)
+        right: 1080,  // 0.75" (outside)
+        header: 720,
+        footer: 720,
+        gutter: 0,
+    };
+
+    let font = "Garamond";
+
+    // Styles
+    let body_style = Style::new("BodyText", StyleType::Paragraph)
+        .name("Body Text")
+        .size(22)
+        .fonts(docx_rs::RunFonts::new().ascii(font).hi_ansi(font))
+        .line_spacing(LineSpacing::new().line(312).line_rule(LineSpacingType::Auto));
+
+    let body_indent = Style::new("BodyTextIndent", StyleType::Paragraph)
+        .name("Body Text Indent")
+        .based_on("BodyText")
+        .size(22)
+        .fonts(docx_rs::RunFonts::new().ascii(font).hi_ansi(font))
+        .line_spacing(LineSpacing::new().line(312).line_rule(LineSpacingType::Auto))
+        .indent(None, Some(SpecialIndentType::FirstLine(432)), None, None);
+
+    let heading1 = Style::new("Heading1", StyleType::Paragraph)
+        .name("heading 1")
+        .size(48)
+        .bold()
+        .fonts(docx_rs::RunFonts::new().ascii(font).hi_ansi(font))
+        .align(AlignmentType::Center)
+        .line_spacing(LineSpacing::new().before(240).after(240));
+
+    let heading2 = Style::new("Heading2", StyleType::Paragraph)
+        .name("heading 2")
+        .size(28)
+        .bold()
+        .fonts(docx_rs::RunFonts::new().ascii(font).hi_ansi(font))
+        .line_spacing(LineSpacing::new().before(360).after(120));
+
+    let heading3 = Style::new("Heading3", StyleType::Paragraph)
+        .name("heading 3")
+        .size(24)
+        .bold()
+        .fonts(docx_rs::RunFonts::new().ascii(font).hi_ansi(font))
+        .line_spacing(LineSpacing::new().before(240).after(60));
+
+    let chapter_num = Style::new("ChapterNum", StyleType::Paragraph)
+        .name("Chapter Number")
+        .size(24)
+        .fonts(docx_rs::RunFonts::new().ascii(font).hi_ansi(font))
+        .align(AlignmentType::Center)
+        .line_spacing(LineSpacing::new().after(120));
+
+    let title_style = Style::new("TitlePage", StyleType::Paragraph)
+        .name("Title Page")
+        .size(56)
+        .bold()
+        .fonts(docx_rs::RunFonts::new().ascii(font).hi_ansi(font))
+        .align(AlignmentType::Center);
+
+    let subtitle = Style::new("Subtitle", StyleType::Paragraph)
+        .name("Subtitle")
+        .size(28)
+        .italic()
+        .fonts(docx_rs::RunFonts::new().ascii(font).hi_ansi(font))
+        .align(AlignmentType::Center);
+
+    let author = Style::new("Author", StyleType::Paragraph)
+        .name("Author")
+        .size(28)
+        .fonts(docx_rs::RunFonts::new().ascii(font).hi_ansi(font))
+        .align(AlignmentType::Center);
+
+    let copyright = Style::new("Copyright", StyleType::Paragraph)
+        .name("Copyright")
+        .size(18)
+        .fonts(docx_rs::RunFonts::new().ascii(font).hi_ansi(font));
+
+    // Footer with centered page number
+    let page_footer = docx_rs::Footer::new().add_paragraph(
+        Paragraph::new()
+            .align(AlignmentType::Center)
+            .add_run(Run::new().add_field_char(docx_rs::FieldCharType::Begin, false))
+            .add_run(Run::new().add_instr_text(docx_rs::InstrText::Unsupported("PAGE".to_string())))
+            .add_run(Run::new().add_field_char(docx_rs::FieldCharType::Separate, false))
+            .add_run(Run::new().add_text("1").size(20).fonts(docx_rs::RunFonts::new().ascii(font).hi_ansi(font)))
+            .add_run(Run::new().add_field_char(docx_rs::FieldCharType::End, false))
+    );
+
+    let first_footer = docx_rs::Footer::new().add_paragraph(Paragraph::new());
+
+    let mut doc = Docx::new()
+        .page_size(KDP_PAGE_W, KDP_PAGE_H)
+        .page_margin(margin)
+        .default_size(22)
+        .default_line_spacing(LineSpacing::new().line(312).line_rule(LineSpacingType::Auto))
+        .footer(page_footer)
+        .first_footer(first_footer)
+        .add_style(body_style)
+        .add_style(body_indent)
+        .add_style(heading1)
+        .add_style(heading2)
+        .add_style(heading3)
+        .add_style(chapter_num)
+        .add_style(title_style)
+        .add_style(subtitle)
+        .add_style(author)
+        .add_style(copyright);
+
+    if let Some(t) = title {
+        doc = doc.custom_property("title", t);
+    }
+
+    doc
 }
