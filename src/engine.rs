@@ -48,6 +48,13 @@ pub fn create_kdp_technical(doc: &mut Document) {
     doc.set_first_page_footer("");
     doc.set_title("Untitled Technical Book");
     doc.set_gutter(Length::inches(0.125));
+    doc.set_theme(
+        &[("dk1","000000"),("lt1","FFFFFF"),("dk2","2E4057"),("lt2","F5F5F5"),
+          ("accent1","2980B9"),("accent2","E74C3C"),("accent3","27AE60"),
+          ("accent4","F39C12"),("accent5","8E44AD"),("accent6","16A085"),
+          ("hlink","2980B9"),("folHlink","8E44AD")],
+        "Garamond", "Garamond",
+    );
 }
 
 pub fn create_kdp_novel(doc: &mut Document) {
@@ -57,6 +64,13 @@ pub fn create_kdp_novel(doc: &mut Document) {
     doc.set_different_first_page(true);
     doc.set_first_page_footer("");
     doc.set_title("Untitled Novel");
+    doc.set_theme(
+        &[("dk1","1A1A1A"),("lt1","FFFFF8"),("dk2","333333"),("lt2","F8F4E8"),
+          ("accent1","8B4513"),("accent2","2F4F4F"),("accent3","800020"),
+          ("accent4","4A4A4A"),("accent5","6B4423"),("accent6","2E4A3E"),
+          ("hlink","8B4513"),("folHlink","800020")],
+        "Garamond", "Garamond",
+    );
 }
 
 pub fn create_kdp_cookbook(doc: &mut Document) {
@@ -66,6 +80,13 @@ pub fn create_kdp_cookbook(doc: &mut Document) {
     doc.set_different_first_page(true);
     doc.set_first_page_footer("");
     doc.set_title("Untitled Cookbook");
+    doc.set_theme(
+        &[("dk1","2C2C2C"),("lt1","FFFFFF"),("dk2","4A3728"),("lt2","FFF8F0"),
+          ("accent1","D4A574"),("accent2","C0392B"),("accent3","27AE60"),
+          ("accent4","F4D03F"),("accent5","E67E22"),("accent6","6C3483"),
+          ("hlink","C0392B"),("folHlink","6C3483")],
+        "Gill Sans MT", "Georgia",
+    );
 }
 
 pub fn create_kdp_children(doc: &mut Document) {
@@ -75,6 +96,13 @@ pub fn create_kdp_children(doc: &mut Document) {
     doc.set_different_first_page(true);
     doc.set_first_page_footer("");
     doc.set_title("Untitled Children's Book");
+    doc.set_theme(
+        &[("dk1","2C3E50"),("lt1","FFFFFF"),("dk2","34495E"),("lt2","FDFEFE"),
+          ("accent1","3498DB"),("accent2","E74C3C"),("accent3","2ECC71"),
+          ("accent4","F1C40F"),("accent5","9B59B6"),("accent6","E67E22"),
+          ("hlink","3498DB"),("folHlink","9B59B6")],
+        "Century Schoolbook", "Century Schoolbook",
+    );
 }
 
 pub fn create_kdp_interior_design(doc: &mut Document) {
@@ -84,6 +112,13 @@ pub fn create_kdp_interior_design(doc: &mut Document) {
     doc.set_different_first_page(true);
     doc.set_first_page_footer("");
     doc.set_title("Untitled Interior Design Book");
+    doc.set_theme(
+        &[("dk1","1C1C1C"),("lt1","FFFFFF"),("dk2","3D3D3D"),("lt2","F7F7F7"),
+          ("accent1","B8860B"),("accent2","2F4F4F"),("accent3","8B7355"),
+          ("accent4","CD853F"),("accent5","556B2F"),("accent6","4682B4"),
+          ("hlink","B8860B"),("folHlink","2F4F4F")],
+        "Futura", "Minion Pro",
+    );
 }
 
 pub fn create_kdp_encyclopedia(doc: &mut Document) {
@@ -94,6 +129,13 @@ pub fn create_kdp_encyclopedia(doc: &mut Document) {
     doc.set_different_first_page(true);
     doc.set_first_page_footer("");
     doc.set_title("Untitled Encyclopedia");
+    doc.set_theme(
+        &[("dk1","000000"),("lt1","FFFFFF"),("dk2","1B2631"),("lt2","EAECEE"),
+          ("accent1","1A5276"),("accent2","922B21"),("accent3","196F3D"),
+          ("accent4","7D6608"),("accent5","6C3483"),("accent6","1B4F72"),
+          ("hlink","1A5276"),("folHlink","6C3483")],
+        "Myriad Pro", "Minion Pro",
+    );
 }
 
 pub fn create_kdp_manga(doc: &mut Document) {
