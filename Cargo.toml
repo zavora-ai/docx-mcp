@@ -1,8 +1,8 @@
 [package]
 name = "docx-mcp-server"
-version = "1.1.0"
+version = "2.1.0"
 edition = "2021"
-description = "DOCX MCP Server — 29 tools for creating, reading, editing, and converting Word documents"
+description = "DOCX MCP Server — 32 tools for creating, reading, editing, and converting Word documents with professional book formatting"
 license = "Apache-2.0"
 repository = "https://github.com/zavora-ai/docx-mcp"
 homepage = "https://zavora.ai"
@@ -12,7 +12,7 @@ readme = "README.md"
 
 [dependencies]
 rmcp = { version = "1.7", features = ["server", "transport-io", "macros"] }
-docx-rs = "0.4"
+rdocx = "0.1"
 tokio = { version = "1", features = ["full"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
@@ -22,5 +22,5 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 uuid = { version = "1", features = ["v4"] }
 thiserror = "2"
-regex = "1"
 
+[workspace]
