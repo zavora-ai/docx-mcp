@@ -1,0 +1,1166 @@
+//! MCP server with tool routing.
+
+use rmcp::{handler::server::wrapper::Parameters, schemars, tool, tool_router};
+use serde::Deserialize;
+use crate::engine::{self, SharedStore};
+
+// ── Input types ──────────────────────────────────────────────────────────────
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct CreateInput {
+    pub title: Option<String>,
+    /// "kdp:technical", "kdp:novel", "kdp:cookbook", "kdp:children", "kdp:interior_design", "kdp:encyclopedia", "kdp:manga", or omit for blank
+    pub format: Option<String>,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct HandleInput { pub document_handle: String }
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct OpenInput { pub file_path: String }
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct SaveInput { pub document_handle: String, pub output_path: String }
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct InsertParaInput {
+    pub document_handle: String,
+    pub index: usize,
+    pub text: String,
+    /// "Heading1", "Heading2", "Heading3", "BodyText", "BodyTextIndent", "ChapterNum", "TitlePage", "Subtitle", "Author", "Copyright"
+    pub style: Option<String>,
+    pub page_break_before: Option<bool>,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct CodeBlockInput {
+    pub document_handle: String,
+    pub index: usize,
+    pub code: String,
+    /// "rust", "python", "bash", "json", etc.
+    pub language: Option<String>,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct CalloutInput {
+    pub document_handle: String,
+    pub index: usize,
+    /// "tip", "warning", or "note"
+    pub callout_type: String,
+    pub text: String,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct TableInput {
+    pub document_handle: String,
+    pub index: usize,
+    pub rows: usize,
+    pub cols: usize,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct CellInput {
+    pub document_handle: String,
+    pub row: usize,
+    pub col: usize,
+    pub text: String,
+    /// Which table (0-based index among all tables in document)
+    pub table_index: Option<usize>,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct ImageInput {
+    pub document_handle: String,
+    pub image_path: String,
+    /// Width in inches
+    pub width: Option<f64>,
+    /// Height in inches
+    pub height: Option<f64>,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct TocInput {
+    pub document_handle: String,
+    pub index: usize,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct SceneBreakInput {
+    pub document_handle: String,
+    pub index: usize,
+    /// "asterisks", "diamond", or "blank"
+    pub style: Option<String>,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct HeaderFooterInput {
+    pub document_handle: String,
+    pub header: Option<String>,
+    pub footer: Option<String>,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct ExportInput { pub document_handle: String }
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct SavePdfInput { pub document_handle: String, pub output_path: String }
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct ReadParasInput { pub document_handle: String, pub offset: Option<usize>, pub limit: Option<usize> }
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct ReadParaInput { pub document_handle: String, pub index: usize }
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct ReadTableInput { pub document_handle: String, pub table_index: Option<usize> }
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct SearchInput { pub document_handle: String, pub query: String }
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct ReplaceInput { pub document_handle: String, pub find: String, pub replace: String }
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct DeleteInput { pub document_handle: String, pub index: usize }
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct UpdateParaInput { pub document_handle: String, pub index: usize, pub text: String }
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct RunFormatInput { pub document_handle: String, pub paragraph_index: usize, pub text: String, pub bold: Option<bool>, pub italic: Option<bool>, pub underline: Option<bool>, pub font: Option<String>, pub size: Option<f64>, pub color: Option<String> }
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct ParaFormatInput { pub document_handle: String, pub index: usize, pub alignment: Option<String>, pub space_before: Option<f64>, pub space_after: Option<f64>, pub line_spacing: Option<f64> }
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct ListInput { pub document_handle: String, pub items: Vec<String>, pub list_type: Option<String>, pub index: Option<usize> }
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct TableWithDataInput { pub document_handle: String, pub index: usize, pub headers: Vec<String>, pub rows: Vec<Vec<String>> }
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct MergeCellsInput {
+    pub document_handle: String,
+    pub table_index: Option<usize>,
+    /// "horizontal" merges columns via grid_span, "vertical" merges rows via v_merge
+    pub direction: String,
+    pub start_row: usize,
+    pub start_col: usize,
+    /// Number of cells to merge (columns for horizontal, rows for vertical)
+    pub span: usize,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct AddRowInput {
+    pub document_handle: String,
+    pub table_index: Option<usize>,
+    /// Cell values for the new row
+    pub cells: Vec<String>,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct PageLayoutInput {
+    pub document_handle: String,
+    /// Page width in inches (e.g. 8.5 for US Letter)
+    pub width: Option<f64>,
+    /// Page height in inches (e.g. 11 for US Letter)
+    pub height: Option<f64>,
+    /// "portrait" or "landscape"
+    pub orientation: Option<String>,
+    /// Margins in inches: [top, right, bottom, left]
+    pub margins: Option<Vec<f64>>,
+    /// Number of text columns
+    pub columns: Option<u32>,
+    /// Gutter width in inches (extra inside margin for binding)
+    pub gutter: Option<f64>,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct SetMetadataInput {
+    pub document_handle: String,
+    pub title: Option<String>,
+    pub author: Option<String>,
+    pub subject: Option<String>,
+    pub keywords: Option<String>,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct MergeDocumentsInput {
+    pub document_handle: String,
+    /// Path to the document to append
+    pub other_path: String,
+    /// Section break type between documents: "nextPage", "continuous", "evenPage", "oddPage"
+    pub break_type: Option<String>,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct RenderPageInput {
+    pub document_handle: String,
+    /// 0-based page index to render
+    pub page_index: usize,
+    /// DPI for rendering (default 150)
+    pub dpi: Option<f64>,
+    /// Output file path for the PNG
+    pub output_path: String,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct RegexReplaceInput {
+    pub document_handle: String,
+    /// Regex pattern to match
+    pub pattern: String,
+    /// Replacement string (supports $1, $2 capture groups)
+    pub replacement: String,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct FormatTableInput {
+    pub document_handle: String,
+    pub table_index: Option<usize>,
+    /// Table width as percentage (0-100) or omit for auto
+    pub width_pct: Option<f64>,
+    /// Table alignment: "left", "center", "right"
+    pub alignment: Option<String>,
+    /// Border style: "single", "double", "dashed", "dotted", "none"
+    pub border_style: Option<String>,
+    /// Border color (hex, e.g. "000000")
+    pub border_color: Option<String>,
+    /// Border size in eighths of a point
+    pub border_size: Option<u32>,
+    /// Cell margins in points: [top, right, bottom, left]
+    pub cell_margins: Option<Vec<f64>>,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct FormatCellInput {
+    pub document_handle: String,
+    pub table_index: Option<usize>,
+    pub row: usize,
+    pub col: usize,
+    /// Background shading color (hex, e.g. "E2EFDA")
+    pub shading: Option<String>,
+    /// Vertical alignment: "top", "center", "bottom"
+    pub vertical_alignment: Option<String>,
+    /// Cell width in inches
+    pub width: Option<f64>,
+    /// Prevent text wrapping
+    pub no_wrap: Option<bool>,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct SectionBreakInput {
+    pub document_handle: String,
+    pub index: usize,
+    /// Break type: "nextPage", "continuous", "evenPage", "oddPage"
+    pub break_type: Option<String>,
+    /// Optional page width in inches for the new section
+    pub page_width: Option<f64>,
+    /// Optional page height in inches for the new section
+    pub page_height: Option<f64>,
+    /// Optional orientation for the new section: "portrait" or "landscape"
+    pub orientation: Option<String>,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct FootnoteInput { pub document_handle: String, pub text: String }
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct FootnoteRefInput { pub document_handle: String, pub paragraph_index: usize, pub footnote_id: i32 }
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct HyperlinkInput { pub document_handle: String, pub paragraph_index: usize, pub url: String, pub text: String }
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct BookmarkInput { pub document_handle: String, pub paragraph_index: usize, pub id: u32, pub name: String }
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct CommentInput { pub document_handle: String, pub id: u32, pub author: String, pub text: String }
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct CommentRangeInput { pub document_handle: String, pub paragraph_index: usize, pub comment_id: u32, pub commented_text: String }
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct WatermarkInput { pub document_handle: String, pub text: String, /// Hex color e.g. "C0C0C0"
+    pub color: Option<String>, /// Rotation in degrees (default -45)
+    pub rotation: Option<i32> }
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct TrackedInsertInput { pub document_handle: String, pub paragraph_index: usize, pub text: String, pub author: String }
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct TrackedDeleteInput { pub document_handle: String, pub paragraph_index: usize, pub text: String, pub author: String }
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct TextFieldInput { pub document_handle: String, pub paragraph_index: usize, pub name: String, pub default_value: Option<String>, pub label: Option<String> }
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct CheckboxInput { pub document_handle: String, pub paragraph_index: usize, pub name: String, pub checked: Option<bool>, pub label: Option<String> }
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct DropdownInput { pub document_handle: String, pub paragraph_index: usize, pub name: String, pub options: Vec<String>, pub selected: Option<usize>, pub label: Option<String> }
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct ProtectInput { pub document_handle: String, /// "readonly", "forms", "comments", "trackedChanges"
+    pub protection_type: String }
+
+// ── Server ───────────────────────────────────────────────────────────────────
+
+#[derive(Clone)]
+pub struct DocxServer {
+    store: SharedStore,
+}
+
+impl DocxServer {
+    pub fn new() -> Self {
+        Self { store: engine::new_store() }
+    }
+}
+
+macro_rules! with_doc {
+    ($store:expr, $handle:expr, $body:expr) => {{
+        let mut store = $store.lock().await;
+        match store.get_mut(&$handle) {
+            Some(doc) => {
+                let result = $body(doc);
+                result
+            }
+            None => serde_json::json!({"error": "Document not found"}).to_string(),
+        }
+    }};
+}
+
+#[tool_router(server_handler)]
+impl DocxServer {
+    #[tool(description = "Create a new DOCX document. format: 'kdp:technical' (6x9), 'kdp:novel' (5.25x8), 'kdp:cookbook' (8x10), 'kdp:children' (8.5x8.5 square), 'kdp:interior_design' (8.5x11), 'kdp:encyclopedia' (8.5x11 2-col), 'kdp:manga' (5x7.5), or omit for blank.")]
+    async fn create_document(&self, Parameters(input): Parameters<CreateInput>) -> String {
+        let mut doc = zavora_docx::Document::new();
+        match input.format.as_deref() {
+            Some("kdp:technical" | "kdp") => engine::create_kdp_technical(&mut doc),
+            Some("kdp:novel") => engine::create_kdp_novel(&mut doc),
+            Some("kdp:cookbook") => engine::create_kdp_cookbook(&mut doc),
+            Some("kdp:children") => engine::create_kdp_children(&mut doc),
+            Some("kdp:interior_design") => engine::create_kdp_interior_design(&mut doc),
+            Some("kdp:encyclopedia") => engine::create_kdp_encyclopedia(&mut doc),
+            Some("kdp:manga") => engine::create_kdp_manga(&mut doc),
+            _ => {}
+        }
+        let mut store = self.store.lock().await;
+        let handle = store.insert(doc);
+        serde_json::json!({"handle": handle}).to_string()
+    }
+
+    #[tool(description = "Open an existing .docx file from disk")]
+    async fn open_document(&self, Parameters(input): Parameters<OpenInput>) -> String {
+        match zavora_docx::Document::open(&input.file_path) {
+            Ok(doc) => {
+                let mut store = self.store.lock().await;
+                let handle = store.insert(doc);
+                serde_json::json!({"handle": handle}).to_string()
+            }
+            Err(e) => serde_json::json!({"error": e.to_string()}).to_string(),
+        }
+    }
+
+    #[tool(description = "Save document to disk as .docx")]
+    async fn save_document(&self, Parameters(input): Parameters<SaveInput>) -> String {
+        with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
+            match doc.save(&input.output_path) {
+                Ok(_) => serde_json::json!({"saved": input.output_path}).to_string(),
+                Err(e) => serde_json::json!({"error": e.to_string()}).to_string(),
+            }
+        })
+    }
+
+    #[tool(description = "Close a document and free memory")]
+    async fn close_document(&self, Parameters(input): Parameters<HandleInput>) -> String {
+        let mut store = self.store.lock().await;
+        if store.remove(&input.document_handle) {
+            serde_json::json!({"closed": true}).to_string()
+        } else {
+            serde_json::json!({"error": "Not found"}).to_string()
+        }
+    }
+
+    #[tool(description = "Get document info: paragraph count, table count, word count")]
+    async fn describe_document(&self, Parameters(input): Parameters<HandleInput>) -> String {
+        with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
+            serde_json::json!({
+                "paragraphs": doc.paragraph_count(),
+                "tables": doc.table_count(),
+                "content_elements": doc.content_count(),
+                "word_count": doc.word_count(),
+            }).to_string()
+        })
+    }
+
+    #[tool(description = "Insert a paragraph with optional style and page break. Styles: Heading1, Heading2, Heading3, BodyText, BodyTextIndent, ChapterNum, TitlePage, Subtitle, Author, Copyright")]
+    async fn insert_paragraph(&self, Parameters(input): Parameters<InsertParaInput>) -> String {
+        with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
+            let mut para = doc.insert_paragraph(input.index, "");
+
+            if input.page_break_before.unwrap_or(false) {
+                para = para.page_break_before(true);
+            }
+
+            // Apply style-specific formatting
+            let style = input.style.as_deref();
+            match style {
+                Some("Heading1") => {
+                    para = para.alignment(zavora_docx::Alignment::Center)
+                        .space_before(zavora_docx::Length::pt(24.0))
+                        .space_after(zavora_docx::Length::pt(12.0))
+                        .keep_with_next(true)
+                        .outline_level(0);
+                    para.add_run(&input.text).font("Garamond").size(24.0).bold(true);
+                }
+                Some("Heading2") => {
+                    para = para.space_before(zavora_docx::Length::pt(18.0))
+                        .space_after(zavora_docx::Length::pt(6.0))
+                        .keep_with_next(true)
+                        .outline_level(1);
+                    para.add_run(&input.text).font("Garamond").size(14.0).bold(true);
+                }
+                Some("Heading3") => {
+                    para = para.space_before(zavora_docx::Length::pt(12.0))
+                        .space_after(zavora_docx::Length::pt(4.0))
+                        .keep_with_next(true)
+                        .outline_level(2);
+                    para.add_run(&input.text).font("Garamond").size(12.0).bold(true);
+                }
+                Some("BodyTextIndent") => {
+                    para = para.first_line_indent(zavora_docx::Length::inches(0.3))
+                        .line_spacing_multiple(1.3);
+                    para.add_run(&input.text).font("Garamond").size(11.0);
+                }
+                Some("ChapterNum") => {
+                    para = para.alignment(zavora_docx::Alignment::Center)
+                        .space_after(zavora_docx::Length::pt(6.0));
+                    para.add_run(&input.text).font("Garamond").size(12.0).small_caps(true);
+                }
+                Some("TitlePage") => {
+                    para = para.alignment(zavora_docx::Alignment::Center);
+                    para.add_run(&input.text).font("Garamond").size(28.0).bold(true);
+                }
+                Some("Subtitle") => {
+                    para = para.alignment(zavora_docx::Alignment::Center);
+                    para.add_run(&input.text).font("Garamond").size(14.0).italic(true);
+                }
+                Some("Author") => {
+                    para = para.alignment(zavora_docx::Alignment::Center);
+                    para.add_run(&input.text).font("Garamond").size(14.0);
+                }
+                Some("Copyright") => {
+                    para.add_run(&input.text).font("Garamond").size(9.0);
+                }
+                _ => {
+                    // BodyText (default)
+                    para = para.line_spacing_multiple(1.3);
+                    para.add_run(&input.text).font("Garamond").size(11.0);
+                }
+            }
+
+            serde_json::json!({"index": input.index}).to_string()
+        })
+    }
+
+    #[tool(description = "Insert a syntax-highlighted code block with gray background (Courier New 9pt). Supports 'rust' highlighting.")]
+    async fn insert_code_block(&self, Parameters(input): Parameters<CodeBlockInput>) -> String {
+        with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
+            let lines = engine::insert_code_block(doc, input.index, &input.code, input.language.as_deref());
+            serde_json::json!({"lines_inserted": lines}).to_string()
+        })
+    }
+
+    #[tool(description = "Insert a callout box with colored background and border (tip=green, warning=orange, note=blue)")]
+    async fn insert_callout(&self, Parameters(input): Parameters<CalloutInput>) -> String {
+        with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
+            engine::insert_callout(doc, input.index, &input.callout_type, &input.text);
+            serde_json::json!({"inserted": true}).to_string()
+        })
+    }
+
+    #[tool(description = "Insert a table at the given position")]
+    async fn add_table(&self, Parameters(input): Parameters<TableInput>) -> String {
+        with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
+            doc.insert_table(input.index, input.rows, input.cols);
+            serde_json::json!({"index": input.index, "rows": input.rows, "cols": input.cols}).to_string()
+        })
+    }
+
+    #[tool(description = "Set text in a table cell by table_index (0-based), row, and col.")]
+    async fn set_table_cell(&self, Parameters(input): Parameters<CellInput>) -> String {
+        with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
+            let ti = input.table_index.unwrap_or(0);
+            match doc.table_mut(ti) {
+                Some(mut table) => match table.cell(input.row, input.col) {
+                    Some(mut cell) => { cell.set_text(&input.text); serde_json::json!({"set": true, "table": ti, "row": input.row, "col": input.col}).to_string() }
+                    None => serde_json::json!({"error": "CELL_NOT_FOUND"}).to_string(),
+                },
+                None => serde_json::json!({"error": "TABLE_NOT_FOUND"}).to_string(),
+            }
+        })
+    }
+
+    #[tool(description = "Add an image from file path")]
+    async fn add_image(&self, Parameters(input): Parameters<ImageInput>) -> String {
+        with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
+            let img_data = match std::fs::read(&input.image_path) {
+                Ok(d) => d,
+                Err(e) => return serde_json::json!({"error": e.to_string()}).to_string(),
+            };
+            let ext = input.image_path.rsplit('.').next().unwrap_or("png");
+            let filename = format!("image.{}", ext);
+            let w = zavora_docx::Length::inches(input.width.unwrap_or(4.0));
+            let h = zavora_docx::Length::inches(input.height.unwrap_or(3.0));
+            doc.add_picture(&img_data, &filename, w, h);
+            serde_json::json!({"added": true}).to_string()
+        })
+    }
+
+    #[tool(description = "Insert a linked Table of Contents at the given position")]
+    async fn add_toc(&self, Parameters(input): Parameters<TocInput>) -> String {
+        with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
+            doc.insert_toc(input.index, 3);
+            serde_json::json!({"index": input.index}).to_string()
+        })
+    }
+
+    #[tool(description = "Insert a scene break (for novels). style: 'asterisks', 'diamond', or 'blank'")]
+    async fn insert_scene_break(&self, Parameters(input): Parameters<SceneBreakInput>) -> String {
+        with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
+            engine::insert_scene_break(doc, input.index, input.style.as_deref().unwrap_or("asterisks"));
+            serde_json::json!({"inserted": true}).to_string()
+        })
+    }
+
+    #[tool(description = "Set header and/or footer text. Use {{PAGE}} for page numbers.")]
+    async fn set_header_footer(&self, Parameters(input): Parameters<HeaderFooterInput>) -> String {
+        with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
+            if let Some(h) = &input.header { doc.set_header(h); }
+            if let Some(f) = &input.footer { doc.set_footer(f); }
+            serde_json::json!({"set": true}).to_string()
+        })
+    }
+
+    #[tool(description = "Export document as plain text")]
+    async fn to_plain_text(&self, Parameters(input): Parameters<ExportInput>) -> String {
+        with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
+            let mut text = String::new();
+            for para in doc.paragraphs() {
+                text.push_str(&para.text());
+                text.push('\n');
+            }
+            serde_json::json!({"text": text}).to_string()
+        })
+    }
+
+    #[tool(description = "Export document as Markdown. Headings become #/##/###, paragraphs become text blocks.")]
+    async fn to_markdown(&self, Parameters(input): Parameters<ExportInput>) -> String {
+        with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
+            serde_json::json!({"markdown": doc.to_markdown()}).to_string()
+        })
+    }
+
+    #[tool(description = "Export document as HTML fragment.")]
+    async fn to_html(&self, Parameters(input): Parameters<ExportInput>) -> String {
+        with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
+            serde_json::json!({"html": doc.to_html_fragment()}).to_string()
+        })
+    }
+
+    #[tool(description = "Export document as PDF. Saves to the given file path.")]
+    async fn save_pdf(&self, Parameters(input): Parameters<SavePdfInput>) -> String {
+        with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
+            match doc.save_pdf(&input.output_path) {
+                Ok(_) => serde_json::json!({"saved": input.output_path}).to_string(),
+                Err(e) => serde_json::json!({"error": e.to_string()}).to_string(),
+            }
+        })
+    }
+
+    #[tool(description = "Read paragraphs with pagination. Returns text and index for each paragraph.")]
+    async fn read_paragraphs(&self, Parameters(input): Parameters<ReadParasInput>) -> String {
+        with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
+            let offset = input.offset.unwrap_or(0);
+            let limit = input.limit.unwrap_or(20);
+            let paras = doc.paragraphs();
+            let total = paras.len();
+            let items: Vec<serde_json::Value> = paras.iter().enumerate().skip(offset).take(limit).map(|(i, p)| {
+                serde_json::json!({"index": i, "text": p.text(), "outline_level": p.style_id()})
+            }).collect();
+            serde_json::json!({"total": total, "offset": offset, "count": items.len(), "paragraphs": items}).to_string()
+        })
+    }
+
+    #[tool(description = "Read a single paragraph with full detail (text, formatting info).")]
+    async fn read_paragraph(&self, Parameters(input): Parameters<ReadParaInput>) -> String {
+        with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
+            let paras = doc.paragraphs();
+            if input.index >= paras.len() { return serde_json::json!({"error": "INDEX_OUT_OF_BOUNDS"}).to_string(); }
+            let p = &paras[input.index];
+            serde_json::json!({"index": input.index, "text": p.text(), "outline_level": p.style_id()}).to_string()
+        })
+    }
+
+    #[tool(description = "Read table content as structured rows and cells.")]
+    async fn read_table(&self, Parameters(input): Parameters<ReadTableInput>) -> String {
+        with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
+            let tables = doc.tables();
+            let ti = input.table_index.unwrap_or(0);
+            if ti >= tables.len() { return serde_json::json!({"error": "TABLE_NOT_FOUND"}).to_string(); }
+            let table = &tables[ti];
+            let mut rows = Vec::new();
+            for r in 0..table.row_count() {
+                if let Some(row) = table.row(r) {
+                    let cells: Vec<String> = (0..row.cell_count()).filter_map(|c| row.cell(c).map(|cell| cell.text())).collect();
+                    rows.push(cells);
+                }
+            }
+            serde_json::json!({"table_index": ti, "rows": table.row_count(), "columns": table.column_count(), "data": rows}).to_string()
+        })
+    }
+
+    #[tool(description = "Search text across all paragraphs. Returns matching paragraph indices and text.")]
+    async fn search_text(&self, Parameters(input): Parameters<SearchInput>) -> String {
+        with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
+            let query_lower = input.query.to_lowercase();
+            let results: Vec<serde_json::Value> = doc.paragraphs().iter().enumerate().filter(|(_, p)| p.text().to_lowercase().contains(&query_lower)).map(|(i, p)| serde_json::json!({"index": i, "text": p.text()})).collect();
+            serde_json::json!({"query": input.query, "matches": results.len(), "results": results}).to_string()
+        })
+    }
+
+    #[tool(description = "Find and replace text across all paragraphs. Returns count of replacements made.")]
+    async fn replace_text(&self, Parameters(input): Parameters<ReplaceInput>) -> String {
+        with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
+            let count = doc.replace_text(&input.find, &input.replace);
+            serde_json::json!({"find": input.find, "replace": input.replace, "replacements": count}).to_string()
+        })
+    }
+
+    #[tool(description = "Delete content element (paragraph or table) by index.")]
+    async fn delete_content(&self, Parameters(input): Parameters<DeleteInput>) -> String {
+        with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
+            if doc.remove_content(input.index) {
+                serde_json::json!({"deleted": true, "index": input.index}).to_string()
+            } else {
+                serde_json::json!({"error": "INDEX_OUT_OF_BOUNDS"}).to_string()
+            }
+        })
+    }
+
+    #[tool(description = "Update paragraph text at given index (replaces entire paragraph text).")]
+    async fn update_paragraph_text(&self, Parameters(input): Parameters<UpdateParaInput>) -> String {
+        with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
+            if input.index >= doc.paragraph_count() { return serde_json::json!({"error": "INDEX_OUT_OF_BOUNDS"}).to_string(); }
+            doc.remove_content(input.index);
+            doc.insert_paragraph(input.index, &input.text);
+            serde_json::json!({"updated": true, "index": input.index}).to_string()
+        })
+    }
+
+    #[tool(description = "Add a formatted text run to a paragraph. Supports bold, italic, underline, font, size, color.")]
+    async fn insert_run(&self, Parameters(input): Parameters<RunFormatInput>) -> String {
+        with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
+            match doc.paragraph_mut(input.paragraph_index) {
+                Some(mut para) => {
+                    let mut run = para.add_run(&input.text);
+                    if let Some(f) = &input.font { run = run.font(f); }
+                    if let Some(s) = input.size { run = run.size(s); }
+                    if input.bold.unwrap_or(false) { run = run.bold(true); }
+                    if input.italic.unwrap_or(false) { run = run.italic(true); }
+                    if input.underline.unwrap_or(false) { run = run.underline(true); }
+                    if let Some(c) = &input.color { run.color(c); }
+                    serde_json::json!({"added": true, "paragraph_index": input.paragraph_index}).to_string()
+                }
+                None => serde_json::json!({"error": "INDEX_OUT_OF_BOUNDS"}).to_string(),
+            }
+        })
+    }
+
+    #[tool(description = "Set paragraph formatting: alignment (left, center, right, justify), spacing, line spacing.")]
+    async fn set_paragraph_format(&self, Parameters(input): Parameters<ParaFormatInput>) -> String {
+        with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
+            match doc.paragraph_mut(input.index) {
+                Some(mut para) => {
+                    if let Some(align) = &input.alignment {
+                        para = match align.as_str() {
+                            "center" => para.alignment(zavora_docx::Alignment::Center),
+                            "right" => para.alignment(zavora_docx::Alignment::Right),
+                            "justify" => para.alignment(zavora_docx::Alignment::Justify),
+                            _ => para.alignment(zavora_docx::Alignment::Left),
+                        };
+                    }
+                    if let Some(sb) = input.space_before { para = para.space_before(zavora_docx::Length::pt(sb)); }
+                    if let Some(sa) = input.space_after { para = para.space_after(zavora_docx::Length::pt(sa)); }
+                    if let Some(ls) = input.line_spacing { para.line_spacing_multiple(ls); }
+                    serde_json::json!({"formatted": true, "index": input.index}).to_string()
+                }
+                None => serde_json::json!({"error": "INDEX_OUT_OF_BOUNDS"}).to_string(),
+            }
+        })
+    }
+
+    #[tool(description = "Create a bulleted or numbered list. list_type: 'bullet' or 'numbered'.")]
+    async fn add_list(&self, Parameters(input): Parameters<ListInput>) -> String {
+        with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
+            let is_numbered = input.list_type.as_deref() == Some("numbered");
+            for item in &input.items {
+                if is_numbered { doc.add_numbered_list_item(item, 0); }
+                else { doc.add_bullet_list_item(item, 0); }
+            }
+            serde_json::json!({"items_added": input.items.len(), "type": if is_numbered { "numbered" } else { "bullet" }}).to_string()
+        })
+    }
+
+    #[tool(description = "Insert a table with headers and pre-populated row data. This is the recommended way to create tables with content.")]
+    async fn insert_table_with_data(&self, Parameters(input): Parameters<TableWithDataInput>) -> String {
+        with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
+            let cols = input.headers.len();
+            let rows = input.rows.len() + 1; // +1 for header
+            let mut table = doc.insert_table(input.index, rows, cols);
+            // Set headers
+            for (c, header) in input.headers.iter().enumerate() {
+                if let Some(mut cell) = table.cell(0, c) { cell.set_text(header); }
+            }
+            // Set data rows
+            for (r, row) in input.rows.iter().enumerate() {
+                for (c, val) in row.iter().enumerate() {
+                    if let Some(mut cell) = table.cell(r + 1, c) { cell.set_text(val); }
+                }
+            }
+            serde_json::json!({"index": input.index, "rows": rows, "cols": cols}).to_string()
+        })
+    }
+
+    #[tool(description = "Merge table cells. direction: 'horizontal' (grid_span across columns) or 'vertical' (v_merge across rows). span = number of cells to merge.")]
+    async fn merge_table_cells(&self, Parameters(input): Parameters<MergeCellsInput>) -> String {
+        with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
+            let ti = input.table_index.unwrap_or(0);
+            match doc.table_mut(ti) {
+                Some(mut table) => {
+                    if input.direction == "horizontal" {
+                        if let Some(cell) = table.cell(input.start_row, input.start_col) {
+                            cell.grid_span(input.span as u32);
+                        }
+                    } else {
+                        // vertical merge: restart on first cell, continue on subsequent
+                        for r in 0..input.span {
+                            if let Some(cell) = table.cell(input.start_row + r, input.start_col) {
+                                if r == 0 { cell.v_merge_restart(); } else { cell.v_merge_continue(); }
+                            }
+                        }
+                    }
+                    serde_json::json!({"merged": true, "direction": input.direction, "span": input.span}).to_string()
+                }
+                None => serde_json::json!({"error": "TABLE_NOT_FOUND"}).to_string(),
+            }
+        })
+    }
+
+    #[tool(description = "Add a row to an existing table with the given cell values.")]
+    async fn add_table_row(&self, Parameters(input): Parameters<AddRowInput>) -> String {
+        with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
+            let ti = input.table_index.unwrap_or(0);
+            match doc.table_mut(ti) {
+                Some(mut table) => {
+                    let row_idx = table.row_count();
+                    let cols = input.cells.len();
+                    let mut row = table.add_row(cols);
+                    for (c, text) in input.cells.iter().enumerate() {
+                        if !text.is_empty() {
+                            if let Some(mut cell) = row.cell(c) { cell.set_text(text); }
+                        }
+                    }
+                    serde_json::json!({"added": true, "row_index": row_idx}).to_string()
+                }
+                None => serde_json::json!({"error": "TABLE_NOT_FOUND"}).to_string(),
+            }
+        })
+    }
+
+    #[tool(description = "Set page layout: size, orientation, margins, columns, gutter. All measurements in inches.")]
+    async fn set_page_layout(&self, Parameters(input): Parameters<PageLayoutInput>) -> String {
+        with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
+            if let (Some(w), Some(h)) = (input.width, input.height) {
+                doc.set_page_size(zavora_docx::Length::inches(w), zavora_docx::Length::inches(h));
+            }
+            match input.orientation.as_deref() {
+                Some("landscape") => doc.set_landscape(),
+                Some("portrait") => doc.set_portrait(),
+                _ => {}
+            }
+            if let Some(m) = &input.margins {
+                if m.len() == 4 {
+                    doc.set_margins(
+                        zavora_docx::Length::inches(m[0]), zavora_docx::Length::inches(m[1]),
+                        zavora_docx::Length::inches(m[2]), zavora_docx::Length::inches(m[3]),
+                    );
+                }
+            }
+            if let Some(cols) = input.columns {
+                doc.set_columns(cols, zavora_docx::Length::inches(0.5));
+            }
+            if let Some(g) = input.gutter {
+                doc.set_gutter(zavora_docx::Length::inches(g));
+            }
+            serde_json::json!({"set": true}).to_string()
+        })
+    }
+
+    #[tool(description = "Set document metadata: title, author, subject, keywords.")]
+    async fn set_metadata(&self, Parameters(input): Parameters<SetMetadataInput>) -> String {
+        with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
+            if let Some(t) = &input.title { doc.set_title(t); }
+            if let Some(a) = &input.author { doc.set_author(a); }
+            if let Some(s) = &input.subject { doc.set_subject(s); }
+            if let Some(k) = &input.keywords { doc.set_keywords(k); }
+            serde_json::json!({"set": true}).to_string()
+        })
+    }
+
+    #[tool(description = "Get document metadata: title, author, subject, keywords, word count.")]
+    async fn get_metadata(&self, Parameters(input): Parameters<HandleInput>) -> String {
+        with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
+            serde_json::json!({
+                "title": doc.title(),
+                "author": doc.author(),
+                "subject": doc.subject(),
+                "keywords": doc.keywords(),
+                "word_count": doc.word_count(),
+            }).to_string()
+        })
+    }
+
+    #[tool(description = "Merge another document into this one. Appends all content with an optional section break between them.")]
+    async fn merge_documents(&self, Parameters(input): Parameters<MergeDocumentsInput>) -> String {
+        let other = match zavora_docx::Document::open(&input.other_path) {
+            Ok(d) => d,
+            Err(e) => return serde_json::json!({"error": e.to_string()}).to_string(),
+        };
+        with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
+            match input.break_type.as_deref() {
+                Some(bt) => {
+                    let brk = match bt {
+                        "continuous" => zavora_docx::SectionBreak::Continuous,
+                        "evenPage" => zavora_docx::SectionBreak::EvenPage,
+                        "oddPage" => zavora_docx::SectionBreak::OddPage,
+                        _ => zavora_docx::SectionBreak::NextPage,
+                    };
+                    doc.append_with_break(&other, brk);
+                }
+                None => doc.append(&other),
+            }
+            serde_json::json!({"merged": true}).to_string()
+        })
+    }
+
+    #[tool(description = "Render a document page as PNG image. Returns the output file path.")]
+    async fn render_page(&self, Parameters(input): Parameters<RenderPageInput>) -> String {
+        with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
+            let dpi = input.dpi.unwrap_or(150.0);
+            match doc.render_page_to_png(input.page_index, dpi) {
+                Ok(Some(png_data)) => {
+                    match std::fs::write(&input.output_path, &png_data) {
+                        Ok(_) => serde_json::json!({"rendered": input.output_path, "bytes": png_data.len()}).to_string(),
+                        Err(e) => serde_json::json!({"error": e.to_string()}).to_string(),
+                    }
+                }
+                Ok(None) => serde_json::json!({"error": "PAGE_NOT_FOUND"}).to_string(),
+                Err(e) => serde_json::json!({"error": e.to_string()}).to_string(),
+            }
+        })
+    }
+
+    #[tool(description = "Get document outline (heading structure). Returns nested heading tree with levels and text.")]
+    async fn document_outline(&self, Parameters(input): Parameters<HandleInput>) -> String {
+        with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
+            let outline = doc.document_outline();
+            let items: Vec<serde_json::Value> = outline.iter().map(|node| {
+                serde_json::json!({"level": node.level, "text": node.text})
+            }).collect();
+            serde_json::json!({"outline": items}).to_string()
+        })
+    }
+
+    #[tool(description = "Find and replace using regex pattern. Supports capture groups ($1, $2) in replacement.")]
+    async fn replace_regex(&self, Parameters(input): Parameters<RegexReplaceInput>) -> String {
+        with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
+            match doc.replace_regex(&input.pattern, &input.replacement) {
+                Ok(count) => serde_json::json!({"replacements": count}).to_string(),
+                Err(e) => serde_json::json!({"error": e.to_string()}).to_string(),
+            }
+        })
+    }
+
+    #[tool(description = "Format a table: width, alignment, borders, cell margins.")]
+    async fn format_table(&self, Parameters(input): Parameters<FormatTableInput>) -> String {
+        with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
+            let ti = input.table_index.unwrap_or(0);
+            match doc.table_mut(ti) {
+                Some(mut table) => {
+                    if let Some(pct) = input.width_pct { table = table.width_pct(pct); }
+                    if let Some(align) = &input.alignment {
+                        let a = match align.as_str() {
+                            "center" => zavora_docx::Alignment::Center,
+                            "right" => zavora_docx::Alignment::Right,
+                            _ => zavora_docx::Alignment::Left,
+                        };
+                        table = table.alignment(a);
+                    }
+                    if let Some(style) = &input.border_style {
+                        let bs = match style.as_str() {
+                            "double" => zavora_docx::BorderStyle::Double,
+                            "dashed" => zavora_docx::BorderStyle::Dashed,
+                            "dotted" => zavora_docx::BorderStyle::Dotted,
+                            "none" => zavora_docx::BorderStyle::None,
+                            _ => zavora_docx::BorderStyle::Single,
+                        };
+                        let color = input.border_color.as_deref().unwrap_or("000000");
+                        let size = input.border_size.unwrap_or(4);
+                        table = table.borders(bs, size, color);
+                    }
+                    if let Some(m) = &input.cell_margins {
+                        if m.len() == 4 {
+                            table.cell_margins(
+                                zavora_docx::Length::pt(m[0]), zavora_docx::Length::pt(m[1]),
+                                zavora_docx::Length::pt(m[2]), zavora_docx::Length::pt(m[3]),
+                            );
+                        }
+                    }
+                    serde_json::json!({"formatted": true}).to_string()
+                }
+                None => serde_json::json!({"error": "TABLE_NOT_FOUND"}).to_string(),
+            }
+        })
+    }
+
+    #[tool(description = "Format a table cell: shading, vertical alignment, width, no-wrap.")]
+    async fn format_table_cell(&self, Parameters(input): Parameters<FormatCellInput>) -> String {
+        with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
+            let ti = input.table_index.unwrap_or(0);
+            match doc.table_mut(ti) {
+                Some(mut table) => match table.cell(input.row, input.col) {
+                    Some(mut cell) => {
+                        if let Some(s) = &input.shading { cell = cell.shading(s); }
+                        if let Some(va) = &input.vertical_alignment {
+                            let align = match va.as_str() {
+                                "center" => zavora_docx::VerticalAlignment::Center,
+                                "bottom" => zavora_docx::VerticalAlignment::Bottom,
+                                _ => zavora_docx::VerticalAlignment::Top,
+                            };
+                            cell = cell.vertical_alignment(align);
+                        }
+                        if let Some(w) = input.width { cell = cell.width(zavora_docx::Length::inches(w)); }
+                        if input.no_wrap.unwrap_or(false) { cell.no_wrap(); }
+                        serde_json::json!({"formatted": true}).to_string()
+                    }
+                    None => serde_json::json!({"error": "CELL_NOT_FOUND"}).to_string(),
+                },
+                None => serde_json::json!({"error": "TABLE_NOT_FOUND"}).to_string(),
+            }
+        })
+    }
+
+    #[tool(description = "Insert a section break at the given index. Allows changing page layout for subsequent content.")]
+    async fn add_section_break(&self, Parameters(input): Parameters<SectionBreakInput>) -> String {
+        with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
+            let bt = match input.break_type.as_deref() {
+                Some("continuous") => zavora_docx::SectionBreak::Continuous,
+                Some("evenPage") => zavora_docx::SectionBreak::EvenPage,
+                Some("oddPage") => zavora_docx::SectionBreak::OddPage,
+                _ => zavora_docx::SectionBreak::NextPage,
+            };
+            let mut para = doc.insert_paragraph(input.index, "");
+            para = para.section_break(bt);
+            if let Some(o) = &input.orientation {
+                match o.as_str() {
+                    "landscape" => { para = para.section_landscape(); }
+                    "portrait" => { para = para.section_portrait(); }
+                    _ => {}
+                }
+            }
+            if let (Some(w), Some(h)) = (input.page_width, input.page_height) {
+                para.section_page_size(zavora_docx::Length::inches(w), zavora_docx::Length::inches(h));
+            }
+            serde_json::json!({"inserted": true, "index": input.index}).to_string()
+        })
+    }
+
+    #[tool(description = "Audit document for accessibility issues: missing alt text, empty headings, skipped heading levels, low contrast.")]
+    async fn audit_accessibility(&self, Parameters(input): Parameters<HandleInput>) -> String {
+        with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
+            let issues = doc.audit_accessibility();
+            let items: Vec<serde_json::Value> = issues.iter().map(|issue| {
+                serde_json::json!({
+                    "severity": format!("{:?}", issue.severity),
+                    "message": issue.message,
+                })
+            }).collect();
+            serde_json::json!({"issues": items.len(), "details": items}).to_string()
+        })
+    }
+
+    // ── New Features: Footnotes, Hyperlinks, Bookmarks, Comments, Watermarks, Track Changes, Form Fields, Protection ──
+
+    #[tool(description = "Add a footnote. Returns the footnote ID to use with add_footnote_ref.")]
+    async fn add_footnote(&self, Parameters(input): Parameters<FootnoteInput>) -> String {
+        with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
+            let id = doc.add_footnote(&input.text);
+            serde_json::json!({"footnote_id": id}).to_string()
+        })
+    }
+
+    #[tool(description = "Add a footnote reference (superscript number) to a paragraph. Use the ID from add_footnote.")]
+    async fn add_footnote_ref(&self, Parameters(input): Parameters<FootnoteRefInput>) -> String {
+        with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
+            match doc.paragraph_mut(input.paragraph_index) {
+                Some(mut para) => {
+                    para.add_run("").footnote_ref(input.footnote_id);
+                    serde_json::json!({"added": true}).to_string()
+                }
+                None => serde_json::json!({"error": "INDEX_OUT_OF_BOUNDS"}).to_string(),
+            }
+        })
+    }
+
+    #[tool(description = "Add a clickable hyperlink to a paragraph. Creates blue underlined text linking to the URL.")]
+    async fn add_hyperlink(&self, Parameters(input): Parameters<HyperlinkInput>) -> String {
+        with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
+            let rel_id = doc.add_hyperlink_rel(&input.url);
+            match doc.paragraph_mut(input.paragraph_index) {
+                Some(mut para) => {
+                    para.add_hyperlink_run(&input.text, Some(&rel_id), None)
+                        .color("0563C1").underline(true);
+                    serde_json::json!({"added": true, "url": input.url}).to_string()
+                }
+                None => serde_json::json!({"error": "INDEX_OUT_OF_BOUNDS"}).to_string(),
+            }
+        })
+    }
+
+    #[tool(description = "Add a bookmark to a paragraph for cross-referencing.")]
+    async fn add_bookmark(&self, Parameters(input): Parameters<BookmarkInput>) -> String {
+        with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
+            match doc.paragraph_mut(input.paragraph_index) {
+                Some(mut para) => {
+                    para.bookmark(input.id, &input.name);
+                    serde_json::json!({"added": true, "name": input.name}).to_string()
+                }
+                None => serde_json::json!({"error": "INDEX_OUT_OF_BOUNDS"}).to_string(),
+            }
+        })
+    }
+
+    #[tool(description = "Add a comment to the document. Use add_comment_range to mark which text the comment applies to.")]
+    async fn add_comment(&self, Parameters(input): Parameters<CommentInput>) -> String {
+        with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
+            doc.add_comment(input.id, &input.author, &input.text);
+            serde_json::json!({"added": true, "comment_id": input.id}).to_string()
+        })
+    }
+
+    #[tool(description = "Mark text in a paragraph as commented. First call add_comment to create the comment, then use this to mark the range.")]
+    async fn add_comment_range(&self, Parameters(input): Parameters<CommentRangeInput>) -> String {
+        with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
+            match doc.paragraph_mut(input.paragraph_index) {
+                Some(mut para) => {
+                    para.comment_start(input.comment_id);
+                    para.add_run(&input.commented_text);
+                    para.comment_end(input.comment_id);
+                    serde_json::json!({"added": true}).to_string()
+                }
+                None => serde_json::json!({"error": "INDEX_OUT_OF_BOUNDS"}).to_string(),
+            }
+        })
+    }
+
+    #[tool(description = "Set a diagonal text watermark on every page (e.g. 'DRAFT', 'CONFIDENTIAL').")]
+    async fn set_watermark(&self, Parameters(input): Parameters<WatermarkInput>) -> String {
+        with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
+            let color = input.color.as_deref().unwrap_or("C0C0C0");
+            doc.set_text_watermark(&input.text, color, input.rotation);
+            serde_json::json!({"set": true, "text": input.text}).to_string()
+        })
+    }
+
+    #[tool(description = "Add tracked insertion (text shown as added in review mode).")]
+    async fn add_tracked_insert(&self, Parameters(input): Parameters<TrackedInsertInput>) -> String {
+        with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
+            match doc.paragraph_mut(input.paragraph_index) {
+                Some(mut para) => {
+                    para.add_tracked_insert(&input.text, &input.author);
+                    serde_json::json!({"added": true}).to_string()
+                }
+                None => serde_json::json!({"error": "INDEX_OUT_OF_BOUNDS"}).to_string(),
+            }
+        })
+    }
+
+    #[tool(description = "Add tracked deletion (text shown as strikethrough in review mode).")]
+    async fn add_tracked_delete(&self, Parameters(input): Parameters<TrackedDeleteInput>) -> String {
+        with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
+            match doc.paragraph_mut(input.paragraph_index) {
+                Some(mut para) => {
+                    para.add_tracked_delete(&input.text, &input.author);
+                    serde_json::json!({"added": true}).to_string()
+                }
+                None => serde_json::json!({"error": "INDEX_OUT_OF_BOUNDS"}).to_string(),
+            }
+        })
+    }
+
+    #[tool(description = "Add a text input form field to a paragraph.")]
+    async fn add_form_text_field(&self, Parameters(input): Parameters<TextFieldInput>) -> String {
+        with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
+            match doc.paragraph_mut(input.paragraph_index) {
+                Some(mut para) => {
+                    if let Some(label) = &input.label { para.add_run(label); }
+                    para.add_text_field(&input.name, input.default_value.as_deref().unwrap_or(""));
+                    serde_json::json!({"added": true}).to_string()
+                }
+                None => serde_json::json!({"error": "INDEX_OUT_OF_BOUNDS"}).to_string(),
+            }
+        })
+    }
+
+    #[tool(description = "Add a checkbox form field to a paragraph.")]
+    async fn add_form_checkbox(&self, Parameters(input): Parameters<CheckboxInput>) -> String {
+        with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
+            match doc.paragraph_mut(input.paragraph_index) {
+                Some(mut para) => {
+                    if let Some(label) = &input.label { para.add_run(label); }
+                    para.add_checkbox(&input.name, input.checked.unwrap_or(false));
+                    serde_json::json!({"added": true}).to_string()
+                }
+                None => serde_json::json!({"error": "INDEX_OUT_OF_BOUNDS"}).to_string(),
+            }
+        })
+    }
+
+    #[tool(description = "Add a dropdown form field to a paragraph.")]
+    async fn add_form_dropdown(&self, Parameters(input): Parameters<DropdownInput>) -> String {
+        with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
+            match doc.paragraph_mut(input.paragraph_index) {
+                Some(mut para) => {
+                    if let Some(label) = &input.label { para.add_run(label); }
+                    let opts: Vec<&str> = input.options.iter().map(|s| s.as_str()).collect();
+                    para.add_dropdown(&input.name, &opts, input.selected.unwrap_or(0));
+                    serde_json::json!({"added": true}).to_string()
+                }
+                None => serde_json::json!({"error": "INDEX_OUT_OF_BOUNDS"}).to_string(),
+            }
+        })
+    }
+
+    #[tool(description = "Protect the document. Types: 'readonly', 'forms' (only form fields editable), 'comments' (only comments allowed), 'trackedChanges'.")]
+    async fn protect_document(&self, Parameters(input): Parameters<ProtectInput>) -> String {
+        with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
+            match input.protection_type.as_str() {
+                "readonly" => doc.protect_readonly(),
+                "forms" => doc.protect_forms_only(),
+                "comments" => doc.protect_comments_only(),
+                "trackedChanges" => doc.protect_tracked_changes_only(),
+                _ => return serde_json::json!({"error": "Invalid type. Use: readonly, forms, comments, trackedChanges"}).to_string(),
+            }
+            serde_json::json!({"protected": true, "type": input.protection_type}).to_string()
+        })
+    }
+
+    #[tool(description = "Remove document protection.")]
+    async fn unprotect_document(&self, Parameters(input): Parameters<HandleInput>) -> String {
+        with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
+            doc.unprotect();
+            serde_json::json!({"unprotected": true}).to_string()
+        })
+    }
+}
