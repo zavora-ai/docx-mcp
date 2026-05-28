@@ -293,6 +293,56 @@ pub struct DropdownInput { pub document_handle: String, pub paragraph_index: usi
 pub struct ProtectInput { pub document_handle: String, /// "readonly", "forms", "comments", "trackedChanges"
     pub protection_type: String }
 
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct DropCapInput { pub document_handle: String, pub paragraph_index: usize, /// Number of lines to span (2-4)
+    pub lines: u32 }
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct TextEffectInput { pub document_handle: String, pub paragraph_index: usize, pub text: String,
+    /// "shadow", "glow", "outline", "reflection"
+    pub effect: String,
+    /// Color hex for shadow/glow/outline (e.g. "4472C4")
+    pub color: Option<String>,
+    /// Size in points (blur for shadow, radius for glow, width for outline)
+    pub size: Option<f64> }
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct ThemeColorRunInput { pub document_handle: String, pub paragraph_index: usize, pub text: String,
+    /// Theme color: "accent1"-"accent6", "dk1", "dk2", "lt1", "lt2", "hlink"
+    pub theme_color: String }
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct BandedTableInput { pub document_handle: String, pub table_index: Option<usize>,
+    /// Hex color for alternating rows (e.g. "D9E2F3")
+    pub band_color: String,
+    /// Header background color
+    pub header_bg: Option<String>,
+    /// Header text color
+    pub header_text: Option<String> }
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct LineNumberingInput { pub document_handle: String,
+    /// Show every Nth line number (1=every line, 5=every 5th)
+    pub count_by: Option<u32>,
+    /// "continuous", "newPage", or "newSection"
+    pub restart: Option<String> }
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct CustomListInput { pub document_handle: String, pub items: Vec<String>,
+    /// "decimal", "upperRoman", "lowerRoman", "upperLetter", "lowerLetter", "bullet"
+    pub format: String,
+    /// Custom bullet character (only for format="bullet"), e.g. "★", "→", "◆"
+    pub bullet_char: Option<String> }
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct ThemeInput { pub document_handle: String,
+    /// Major font (headings)
+    pub major_font: String,
+    /// Minor font (body)
+    pub minor_font: String,
+    /// Accent colors as hex: [accent1, accent2, accent3, accent4, accent5, accent6]
+    pub accent_colors: Option<Vec<String>> }
+
 // ── Server ───────────────────────────────────────────────────────────────────
 
 #[derive(Clone)]
@@ -1161,6 +1211,103 @@ impl DocxServer {
         with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
             doc.unprotect();
             serde_json::json!({"unprotected": true}).to_string()
+        })
+    }
+
+    #[tool(description = "Apply a drop cap to a paragraph (large first letter spanning multiple lines, for chapter openers).")]
+    async fn set_drop_cap(&self, Parameters(input): Parameters<DropCapInput>) -> String {
+        with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
+            match doc.paragraph_mut(input.paragraph_index) {
+                Some(para) => { para.drop_cap(input.lines); serde_json::json!({"set": true}).to_string() }
+                None => serde_json::json!({"error": "INDEX_OUT_OF_BOUNDS"}).to_string(),
+            }
+        })
+    }
+
+    #[tool(description = "Add text with a w14 effect (shadow, glow, outline, or reflection). These are Word 2010+ effects.")]
+    async fn add_text_effect(&self, Parameters(input): Parameters<TextEffectInput>) -> String {
+        with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
+            match doc.paragraph_mut(input.paragraph_index) {
+                Some(mut para) => {
+                    let color = input.color.as_deref().unwrap_or("000000");
+                    let size = input.size.unwrap_or(3.0);
+                    let run = para.add_run(&input.text).font("Calibri").size(18.0).bold(true);
+                    match input.effect.as_str() {
+                        "shadow" => { run.shadow(size, size * 0.7, color); }
+                        "glow" => { run.glow(size, color); }
+                        "outline" => { run.text_outline(size * 0.3, color); }
+                        "reflection" => { run.reflection(); }
+                        _ => {}
+                    }
+                    serde_json::json!({"added": true, "effect": input.effect}).to_string()
+                }
+                None => serde_json::json!({"error": "INDEX_OUT_OF_BOUNDS"}).to_string(),
+            }
+        })
+    }
+
+    #[tool(description = "Add a run with a theme color (accent1-6, dk1, dk2, lt1, lt2, hlink). Colors auto-update when theme changes.")]
+    async fn add_theme_colored_text(&self, Parameters(input): Parameters<ThemeColorRunInput>) -> String {
+        with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
+            match doc.paragraph_mut(input.paragraph_index) {
+                Some(mut para) => {
+                    para.add_run(&input.text).theme_color(&input.theme_color);
+                    serde_json::json!({"added": true}).to_string()
+                }
+                None => serde_json::json!({"error": "INDEX_OUT_OF_BOUNDS"}).to_string(),
+            }
+        })
+    }
+
+    #[tool(description = "Apply banded rows and header styling to a table. Makes tables look professional with alternating colors.")]
+    async fn style_table_banded(&self, Parameters(input): Parameters<BandedTableInput>) -> String {
+        with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
+            let ti = input.table_index.unwrap_or(0);
+            match doc.table_mut(ti) {
+                Some(mut table) => {
+                    table.banded_rows(&input.band_color);
+                    if let (Some(bg), Some(txt)) = (&input.header_bg, &input.header_text) {
+                        table.header_row_style(bg, txt);
+                    }
+                    serde_json::json!({"styled": true}).to_string()
+                }
+                None => serde_json::json!({"error": "TABLE_NOT_FOUND"}).to_string(),
+            }
+        })
+    }
+
+    #[tool(description = "Enable line numbering in the document margin (for legal/academic documents).")]
+    async fn set_line_numbering(&self, Parameters(input): Parameters<LineNumberingInput>) -> String {
+        with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
+            doc.set_line_numbering(input.count_by.unwrap_or(1), input.restart.as_deref().unwrap_or("continuous"));
+            serde_json::json!({"set": true}).to_string()
+        })
+    }
+
+    #[tool(description = "Create a list with custom numbering: Roman numerals, letters, or custom bullet characters (★, →, ◆).")]
+    async fn add_custom_list(&self, Parameters(input): Parameters<CustomListInput>) -> String {
+        with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
+            for item in &input.items {
+                doc.add_custom_list_item(item, 0, &input.format, input.bullet_char.as_deref());
+            }
+            serde_json::json!({"added": input.items.len(), "format": input.format}).to_string()
+        })
+    }
+
+    #[tool(description = "Set the document theme (fonts and colors). Controls the look of all theme-colored text.")]
+    async fn set_theme(&self, Parameters(input): Parameters<ThemeInput>) -> String {
+        with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
+            let defaults = ["4472C4", "ED7D31", "A5A5A5", "FFC000", "5B9BD5", "70AD47"];
+            let accents = input.accent_colors.as_ref();
+            let a = |i: usize| accents.and_then(|v| v.get(i).map(|s| s.as_str())).unwrap_or(defaults[i]);
+            doc.set_theme(
+                &[("dk1", "000000"), ("lt1", "FFFFFF"), ("dk2", "44546A"), ("lt2", "E7E6E6"),
+                  ("accent1", a(0)), ("accent2", a(1)), ("accent3", a(2)),
+                  ("accent4", a(3)), ("accent5", a(4)), ("accent6", a(5)),
+                  ("hlink", "0563C1"), ("folHlink", "954F72")],
+                &input.major_font, &input.minor_font,
+            );
+            serde_json::json!({"set": true, "major_font": input.major_font, "minor_font": input.minor_font}).to_string()
         })
     }
 }
