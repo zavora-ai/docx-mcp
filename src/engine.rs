@@ -238,7 +238,7 @@ fn token_color(kind: &TokenKind) -> Option<&'static str> {
 }
 
 /// Insert a syntax-highlighted code block with gray background.
-pub fn insert_code_block(doc: &mut Document, index: usize, code: &str, language: Option<&str>) -> usize {
+pub fn insert_code_block(doc: &mut Document, index: usize, code: &str, _language: Option<&str>) -> usize {
     let lines: Vec<&str> = code.lines().collect();
     let count = lines.len();
 
@@ -251,26 +251,15 @@ pub fn insert_code_block(doc: &mut Document, index: usize, code: &str, language:
             .keep_together(true);
 
         if i == 0 {
-            para = para.space_before(Length::pt(6.0));
+            para = para.space_before(Length::pt(8.0));
         }
         if i == count - 1 {
-            para = para.space_after(Length::pt(6.0));
+            para = para.space_after(Length::pt(8.0));
         }
 
-        // Apply syntax highlighting for Rust
-        if matches!(language, Some("rust" | "rs")) {
-            let tokens = tokenize_rust(line);
-            for (kind, text) in &tokens {
-                let mut run = para.add_run(text);
-                run = run.font("Courier New").size(9.0);
-                if let Some(color) = token_color(kind) {
-                    run.color(color);
-                }
-            }
-        } else {
-            para.add_run(if line.is_empty() { " " } else { line })
-                .font("Courier New").size(9.0);
-        }
+        // Single run per line — clean monospace rendering
+        para.add_run(if line.is_empty() { " " } else { line })
+            .font("Courier New").size(9.0);
     }
     count
 }
