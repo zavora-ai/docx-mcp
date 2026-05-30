@@ -170,6 +170,53 @@ pub fn create_kdp_novel(doc: &mut Document) {
     create_novel(doc, &NovelConfig::default());
 }
 
+/// Per-genre body/heading styling applied on top of a template's theme + geometry.
+struct BookStyle<'a> {
+    body_font: &'a str,
+    heading_font: &'a str,
+    body_pt: f64,
+    line_spacing: f64,
+    justified: bool,
+    /// Heading color hex (usually the theme's accent1 so headings match the genre).
+    heading_color: &'a str,
+}
+
+/// Apply professional Normal + Heading1-3 styles for non-fiction/illustrated
+/// genres: readable justified (or left) body with widow control, and clean
+/// left-aligned headings in the genre's display font and accent color. Enables
+/// hyphenation when justified. Call AFTER set_theme so fonts/colors are set.
+fn apply_book_styles(doc: &mut Document, s: &BookStyle) {
+    use zavora_docx::{Length, StyleBuilder};
+
+    if s.justified {
+        doc.set_auto_hyphenation(true);
+    }
+    doc.add_style(
+        StyleBuilder::paragraph("Normal", "Normal")
+            .font(s.body_font)
+            .size(s.body_pt)
+            .line_spacing(s.line_spacing)
+            .align(if s.justified { "both" } else { "left" })
+            .widow_control(true),
+    );
+    let heads = [(1u32, 1.7, 0u32), (2, 1.35, 1), (3, 1.15, 2)];
+    for (n, scale, lvl) in heads {
+        doc.add_style(
+            StyleBuilder::paragraph(&format!("Heading{n}"), &format!("heading {n}"))
+                .based_on("Normal")
+                .next_style("Normal")
+                .font(s.heading_font)
+                .size((s.body_pt * scale).round())
+                .bold(true)
+                .color(s.heading_color)
+                .align("left")
+                .spacing(Length::pt(if n == 1 { 20.0 } else { 14.0 }), Length::pt(6.0))
+                .keep_with_next(true)
+                .outline_level(lvl),
+        );
+    }
+}
+
 pub fn create_kdp_cookbook(doc: &mut Document) {
     doc.set_page_size(Length::inches(8.0), Length::inches(10.0));
     doc.set_margins(Length::inches(0.75), Length::inches(0.75), Length::inches(0.75), Length::inches(1.0));
@@ -184,6 +231,10 @@ pub fn create_kdp_cookbook(doc: &mut Document) {
           ("hlink","C0392B"),("folHlink","6C3483")],
         "Gill Sans MT", "Georgia",
     );
+    apply_book_styles(doc, &BookStyle {
+        body_font: "Georgia", heading_font: "Gill Sans MT",
+        body_pt: 11.0, line_spacing: 1.25, justified: true, heading_color: "C0392B",
+    });
 }
 
 pub fn create_kdp_children(doc: &mut Document) {
@@ -200,6 +251,11 @@ pub fn create_kdp_children(doc: &mut Document) {
           ("hlink","3498DB"),("folHlink","9B59B6")],
         "Century Schoolbook", "Century Schoolbook",
     );
+    // Children: large, well-spaced, left-aligned (never justified) for early readers.
+    apply_book_styles(doc, &BookStyle {
+        body_font: "Century Schoolbook", heading_font: "Century Schoolbook",
+        body_pt: 16.0, line_spacing: 1.5, justified: false, heading_color: "E74C3C",
+    });
 }
 
 pub fn create_kdp_interior_design(doc: &mut Document) {
@@ -216,6 +272,10 @@ pub fn create_kdp_interior_design(doc: &mut Document) {
           ("hlink","B8860B"),("folHlink","2F4F4F")],
         "Futura", "Minion Pro",
     );
+    apply_book_styles(doc, &BookStyle {
+        body_font: "Minion Pro", heading_font: "Futura",
+        body_pt: 11.0, line_spacing: 1.3, justified: true, heading_color: "B8860B",
+    });
 }
 
 pub fn create_kdp_encyclopedia(doc: &mut Document) {
@@ -233,6 +293,11 @@ pub fn create_kdp_encyclopedia(doc: &mut Document) {
           ("hlink","1A5276"),("folHlink","6C3483")],
         "Myriad Pro", "Minion Pro",
     );
+    // Two-column reference: justified + hyphenation are essential to avoid rivers.
+    apply_book_styles(doc, &BookStyle {
+        body_font: "Minion Pro", heading_font: "Myriad Pro",
+        body_pt: 10.0, line_spacing: 1.15, justified: true, heading_color: "1A5276",
+    });
 }
 
 pub fn create_kdp_manga(doc: &mut Document) {

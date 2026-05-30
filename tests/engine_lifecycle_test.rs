@@ -41,3 +41,23 @@ fn test_toc_empty_when_no_headings() {
     assert_eq!(found, 0);
     assert_eq!(doc.content_count(), before, "no TOC paragraphs added");
 }
+
+/// Every genre template builds and round-trips without error.
+#[test]
+fn test_all_genres_build_and_round_trip() {
+    let builders: [fn(&mut Document); 6] = [
+        engine::create_kdp_cookbook,
+        engine::create_kdp_children,
+        engine::create_kdp_interior_design,
+        engine::create_kdp_encyclopedia,
+        engine::create_kdp_technical,
+        engine::create_kdp_novel,
+    ];
+    for build in builders {
+        let mut doc = Document::new();
+        build(&mut doc);
+        doc.add_paragraph("Body.").style("Heading1");
+        let bytes = doc.to_bytes().expect("serialize");
+        Document::from_bytes(&bytes).expect("reopen");
+    }
+}
