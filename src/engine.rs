@@ -57,20 +57,113 @@ pub fn create_kdp_technical(doc: &mut Document) {
     );
 }
 
-pub fn create_kdp_novel(doc: &mut Document) {
-    doc.set_page_size(Length::inches(5.25), Length::inches(8.0));
+/// Per-book novel settings so different authors can produce different novels
+/// at different trim sizes from the same engine.
+pub struct NovelConfig {
+    pub title: String,
+    pub author: String,
+    /// Trim size in inches (width, height). Common KDP: 5x8, 5.25x8, 5.5x8.5, 6x9.
+    pub trim: (f64, f64),
+    /// Body + heading font family.
+    pub font: String,
+    /// Body text size in points.
+    pub body_pt: f64,
+    /// Line spacing multiple for body text.
+    pub line_spacing: f64,
+    /// Justify body text (true for most fiction).
+    pub justified: bool,
+    /// Running header text (author on verso, title on recto). None = no header.
+    pub running_header: bool,
+}
+
+impl Default for NovelConfig {
+    fn default() -> Self {
+        Self {
+            title: "Untitled Novel".into(),
+            author: "Anonymous".into(),
+            trim: (5.25, 8.0),
+            font: "Garamond".into(),
+            body_pt: 11.5,
+            line_spacing: 1.3,
+            justified: true,
+            running_header: true,
+        }
+    }
+}
+
+/// Build a professionally-styled novel. Sets page geometry, theme, and overrides
+/// the Normal + Heading1 named styles so chapters, body text, and the TOC all
+/// inherit book-quality formatting (justified body, widow control, chapter
+/// openers). Authors call this with their own NovelConfig.
+pub fn create_novel(doc: &mut Document, cfg: &NovelConfig) {
+    use zavora_docx::{Length, StyleBuilder};
+
+    let (w, h) = cfg.trim;
+    doc.set_page_size(Length::inches(w), Length::inches(h));
+    // Generous inner (binding) margin scales a little with page height.
     doc.set_margins(Length::inches(0.75), Length::inches(0.625), Length::inches(0.75), Length::inches(0.875));
+    doc.set_gutter(Length::inches(0.125));
     doc.set_footer_page_number();
     doc.set_different_first_page(true);
     doc.set_first_page_footer("");
-    doc.set_title("Untitled Novel");
+    doc.set_title(&cfg.title);
+    if cfg.running_header {
+        doc.set_header(&format!("{}        {}", cfg.author, cfg.title));
+    }
     doc.set_theme(
         &[("dk1","1A1A1A"),("lt1","FFFFF8"),("dk2","333333"),("lt2","F8F4E8"),
           ("accent1","8B4513"),("accent2","2F4F4F"),("accent3","800020"),
           ("accent4","4A4A4A"),("accent5","6B4423"),("accent6","2E4A3E"),
           ("hlink","8B4513"),("folHlink","800020")],
-        "Garamond", "Garamond",
+        &cfg.font, &cfg.font,
     );
+
+    // Body text: justified, widow control, author's font/size/spacing.
+    doc.add_style(
+        StyleBuilder::paragraph("Normal", "Normal")
+            .font(&cfg.font)
+            .size(cfg.body_pt)
+            .line_spacing(cfg.line_spacing)
+            .align(if cfg.justified { "both" } else { "left" })
+            .widow_control(true),
+    );
+
+    // Chapter opener (Heading1): centered, dropped down the page, dark small-caps.
+    // outline_level(0) keeps it detectable by the TOC + navigation pane.
+    doc.add_style(
+        StyleBuilder::paragraph("Heading1", "heading 1")
+            .based_on("Normal")
+            .next_style("Normal")
+            .font(&cfg.font)
+            .size((cfg.body_pt + 8.0).max(18.0))
+            .bold(true)
+            .small_caps(true)
+            .color("1A1A1A")
+            .align("center")
+            .spacing(Length::pt(72.0), Length::pt(24.0))
+            .keep_with_next(true)
+            .outline_level(0),
+    );
+
+    // Subhead within a chapter (Heading2): centered, smaller, italic.
+    doc.add_style(
+        StyleBuilder::paragraph("Heading2", "heading 2")
+            .based_on("Normal")
+            .next_style("Normal")
+            .font(&cfg.font)
+            .size(cfg.body_pt + 1.0)
+            .italic(true)
+            .color("333333")
+            .align("center")
+            .spacing(Length::pt(18.0), Length::pt(6.0))
+            .keep_with_next(true)
+            .outline_level(1),
+    );
+}
+
+/// Default novel (back-compat for the "kdp:novel" format dispatch).
+pub fn create_kdp_novel(doc: &mut Document) {
+    create_novel(doc, &NovelConfig::default());
 }
 
 pub fn create_kdp_cookbook(doc: &mut Document) {

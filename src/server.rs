@@ -14,6 +14,26 @@ pub struct CreateInput {
 }
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct NovelInput {
+    pub title: String,
+    pub author: String,
+    /// Trim width in inches (e.g. 5.0, 5.25, 5.5, 6.0). Default 5.25.
+    pub trim_width: Option<f64>,
+    /// Trim height in inches (e.g. 8.0, 8.5, 9.0). Default 8.0.
+    pub trim_height: Option<f64>,
+    /// Body/heading font family. Default "Garamond".
+    pub font: Option<String>,
+    /// Body text size in points. Default 11.5.
+    pub body_pt: Option<f64>,
+    /// Line spacing multiple. Default 1.3.
+    pub line_spacing: Option<f64>,
+    /// Justify body text. Default true.
+    pub justified: Option<bool>,
+    /// Show running header (author / title). Default true.
+    pub running_header: Option<bool>,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
 pub struct HandleInput { pub document_handle: String }
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
@@ -389,6 +409,25 @@ impl DocxServer {
         serde_json::json!({"handle": handle}).to_string()
     }
 
+    #[tool(description = "Create a professionally-styled novel with author-specific settings (trim size, font, spacing). Sets justified body text, widow control, chapter-opener heading style, and a running header. Use insert_paragraph with style=Heading1 for chapter titles (drives the TOC), TitlePage/Subtitle/Author for the title page, and BodyText/BodyTextIndent for prose.")]
+    async fn create_novel(&self, Parameters(input): Parameters<NovelInput>) -> String {
+        let mut doc = zavora_docx::Document::new();
+        let cfg = engine::NovelConfig {
+            title: input.title,
+            author: input.author,
+            trim: (input.trim_width.unwrap_or(5.25), input.trim_height.unwrap_or(8.0)),
+            font: input.font.unwrap_or_else(|| "Garamond".into()),
+            body_pt: input.body_pt.unwrap_or(11.5),
+            line_spacing: input.line_spacing.unwrap_or(1.3),
+            justified: input.justified.unwrap_or(true),
+            running_header: input.running_header.unwrap_or(true),
+        };
+        engine::create_novel(&mut doc, &cfg);
+        let mut store = self.store.lock().await;
+        let handle = store.insert(doc);
+        serde_json::json!({"handle": handle}).to_string()
+    }
+
     #[tool(description = "Open an existing .docx file from disk")]
     async fn open_document(&self, Parameters(input): Parameters<OpenInput>) -> String {
         match zavora_docx::Document::open(&input.file_path) {
@@ -469,26 +508,27 @@ impl DocxServer {
                     para.add_run(&input.text);
                 }
                 Some("BodyTextIndent") => {
-                    para = para.first_line_indent(zavora_docx::Length::inches(0.3))
-                        .line_spacing_multiple(1.3);
-                    para.add_run(&input.text).font("Garamond").size(11.0);
+                    // Inherit Normal (font/size/justify/spacing from the template);
+                    // only add the first-line indent that distinguishes continuation paras.
+                    para = para.first_line_indent(zavora_docx::Length::inches(0.25));
+                    para.add_run(&input.text);
                 }
                 Some("ChapterNum") => {
                     para = para.alignment(zavora_docx::Alignment::Center)
                         .space_after(zavora_docx::Length::pt(6.0));
-                    para.add_run(&input.text).font("Garamond").size(12.0).small_caps(true);
+                    para.add_run(&input.text).small_caps(true);
                 }
                 Some("Author") => {
                     para = para.alignment(zavora_docx::Alignment::Center);
-                    para.add_run(&input.text).font("Garamond").size(14.0);
+                    para.add_run(&input.text);
                 }
                 Some("Copyright") => {
-                    para.add_run(&input.text).font("Garamond").size(9.0);
+                    para.add_run(&input.text).size(9.0);
                 }
                 _ => {
-                    // BodyText (default)
-                    para = para.line_spacing_multiple(1.3);
-                    para.add_run(&input.text).font("Garamond").size(11.0);
+                    // BodyText (default): inherit the document's Normal style so the
+                    // template/author config controls font, size, spacing, justification.
+                    para.add_run(&input.text);
                 }
             }
 
