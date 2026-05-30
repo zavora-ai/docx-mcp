@@ -110,6 +110,10 @@ pub fn create_novel(doc: &mut Document, cfg: &NovelConfig) {
     if cfg.running_header {
         doc.set_running_header(&cfg.author, &cfg.title);
     }
+    // Hyphenation tightens justified prose by breaking long words.
+    if cfg.justified {
+        doc.set_auto_hyphenation(true);
+    }
     doc.set_theme(
         &[("dk1","1A1A1A"),("lt1","FFFFF8"),("dk2","333333"),("lt2","F8F4E8"),
           ("accent1","8B4513"),("accent2","2F4F4F"),("accent3","800020"),
@@ -404,10 +408,11 @@ pub fn insert_chapter_opening(doc: &mut Document, index: usize, text: &str, font
     let first: String = chars.by_ref().take(1).collect();
     let rest: String = chars.collect();
 
-    // Paragraph 1: the drop-cap letter alone, in a frame spanning 3 lines.
-    // Size it ~3x body so it visually fills the frame height.
+    // Paragraph 1: the drop-cap letter alone. Use a 2-line frame and size the
+    // letter (~3.8x body) so its cap-height fills exactly those two lines —
+    // matching the frame avoids the empty gap a 3-line frame leaves.
     let mut cap = doc.insert_paragraph(index, "");
-    cap = cap.drop_cap(3);
+    cap = cap.drop_cap(2);
     cap.add_run(&first).font(font).bold(true).size(44.0);
 
     // Lead-in: first ~3 words after the initial letter rendered in small caps.
