@@ -246,6 +246,10 @@ pub struct SetMetadataInput {
     pub author: Option<String>,
     pub subject: Option<String>,
     pub keywords: Option<String>,
+    /// Company name (docProps/app.xml).
+    pub company: Option<String>,
+    /// Authoring application name (docProps/app.xml).
+    pub application: Option<String>,
 }
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
@@ -1011,6 +1015,8 @@ impl DocxServer {
             if let Some(a) = &input.author { doc.set_author(a); }
             if let Some(s) = &input.subject { doc.set_subject(s); }
             if let Some(k) = &input.keywords { doc.set_keywords(k); }
+            if let Some(c) = &input.company { doc.set_company(c); }
+            if let Some(a) = &input.application { doc.set_application(a); }
             serde_json::json!({"set": true}).to_string()
         })
     }
