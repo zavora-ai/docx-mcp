@@ -130,6 +130,26 @@ pub struct TocInput {
 }
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct TextBoxInput {
+    pub document_handle: String,
+    /// Lines of text inside the box.
+    pub lines: Vec<String>,
+    pub width_inches: Option<f64>,
+    pub height_inches: Option<f64>,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct ShapeInput {
+    pub document_handle: String,
+    /// Preset geometry: "rect", "ellipse", "roundRect", "rightArrow", "star5", etc.
+    pub geometry: String,
+    pub width_inches: Option<f64>,
+    pub height_inches: Option<f64>,
+    /// Solid fill color hex (e.g. "FFCC00").
+    pub fill_color: Option<String>,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
 pub struct EquationInput {
     pub document_handle: String,
     /// LaTeX-subset equation, e.g. "\\frac{a}{b}^2", "\\sum_{i=1}^{n} i", "\\sqrt{x}".
@@ -758,6 +778,26 @@ impl DocxServer {
     async fn add_equation(&self, Parameters(input): Parameters<EquationInput>) -> String {
         with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
             doc.add_equation_latex(&input.latex);
+            serde_json::json!({"added": true}).to_string()
+        })
+    }
+
+    #[tool(description = "Add a rectangular text box (with a border) containing the given lines of text. Width/height default to 3x1.5 inches.")]
+    async fn add_text_box(&self, Parameters(input): Parameters<TextBoxInput>) -> String {
+        with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
+            let w = zavora_docx::Length::inches(input.width_inches.unwrap_or(3.0));
+            let h = zavora_docx::Length::inches(input.height_inches.unwrap_or(1.5));
+            doc.add_text_box(w, h, input.lines.clone());
+            serde_json::json!({"added": true}).to_string()
+        })
+    }
+
+    #[tool(description = "Add a preset shape (DrawingML). geometry is a preset name: rect, roundRect, ellipse, triangle, diamond, rightArrow, leftArrow, star5, hexagon, etc. Optional solid fill_color (hex). Width/height default to 2x2 inches.")]
+    async fn add_shape(&self, Parameters(input): Parameters<ShapeInput>) -> String {
+        with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
+            let w = zavora_docx::Length::inches(input.width_inches.unwrap_or(2.0));
+            let h = zavora_docx::Length::inches(input.height_inches.unwrap_or(2.0));
+            doc.add_shape(w, h, &input.geometry, input.fill_color.as_deref());
             serde_json::json!({"added": true}).to_string()
         })
     }
