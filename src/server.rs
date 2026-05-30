@@ -130,6 +130,25 @@ pub struct TocInput {
 }
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct DocumentSettingsInput {
+    pub document_handle: String,
+    /// Default automatic tab stop width, in inches.
+    pub default_tab_stop_inches: Option<f64>,
+    /// Mirror inside/outside margins for double-sided printing.
+    pub mirror_margins: Option<bool>,
+    /// Enable the track-changes (revisions) flag.
+    pub track_changes: Option<bool>,
+    /// Open-zoom level as a percentage (e.g. 100, 150).
+    pub zoom_percent: Option<u32>,
+    /// Default proofing/theme language (e.g. "en-US", "fr-FR").
+    pub language: Option<String>,
+    /// Force Word to recalculate fields (TOC, PAGEREF) on open.
+    pub update_fields: Option<bool>,
+    /// Enable automatic hyphenation.
+    pub auto_hyphenation: Option<bool>,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
 pub struct SceneBreakInput {
     pub document_handle: String,
     pub index: usize,
@@ -656,6 +675,34 @@ impl DocxServer {
             let ext = input.image_path.rsplit('.').next().unwrap_or("png");
             let at = doc.add_page_background_at(input.index, &img_data, &format!("bg.{ext}"));
             serde_json::json!({"anchored_at": at}).to_string()
+        })
+    }
+
+    #[tool(description = "Set document-level settings in settings.xml: default tab stop (inches), mirror margins, track changes, open zoom percent, proofing language (e.g. en-US), update fields on open, and auto hyphenation. Only provided fields are changed; existing settings are preserved.")]
+    async fn set_document_settings(&self, Parameters(input): Parameters<DocumentSettingsInput>) -> String {
+        with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
+            if let Some(t) = input.default_tab_stop_inches {
+                doc.set_default_tab_stop(zavora_docx::Length::inches(t));
+            }
+            if let Some(v) = input.mirror_margins {
+                doc.set_mirror_margins(v);
+            }
+            if let Some(v) = input.track_changes {
+                doc.set_track_changes(v);
+            }
+            if let Some(z) = input.zoom_percent {
+                doc.set_zoom(z);
+            }
+            if let Some(ref l) = input.language {
+                doc.set_document_language(l);
+            }
+            if let Some(v) = input.update_fields {
+                if v { doc.set_update_fields(); }
+            }
+            if let Some(v) = input.auto_hyphenation {
+                doc.set_auto_hyphenation(v);
+            }
+            serde_json::json!({"updated": true}).to_string()
         })
     }
 
