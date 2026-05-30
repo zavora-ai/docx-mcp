@@ -217,3 +217,32 @@ async fn proposal_template_computes_total() {
     // 6000 + 8×900 = 13200 → auto-summed deliverables total.
     assert!(text.contains("$13,200.00"), "proposal total missing: {text}");
 }
+
+#[tokio::test]
+async fn priced_templates_share_total_logic() {
+    let srv = DocxServer::new();
+    for (fmt, label) in [("business:quote", "$2,700.00"), ("business:receipt", "$2,700.00")] {
+        let data = serde_json::json!({"items": [
+            {"description": "Consulting", "qty": 10, "price": 150},
+            {"description": "License", "qty": 1, "price": 1200}
+        ]});
+        let r = srv.create_document(Parameters(CreateInput {
+            title: None, format: Some(fmt.into()), data: Some(data),
+        })).await;
+        let h = json(&r)["handle"].as_str().expect("handle").to_string();
+        let text = json(&srv.to_plain_text(Parameters(ExportInput { document_handle: h })).await)["text"].as_str().unwrap().to_string();
+        assert!(text.contains(label), "{fmt} total missing: {text}");
+    }
+}
+
+#[tokio::test]
+async fn contract_renders_supplied_clauses() {
+    let srv = DocxServer::new();
+    let data = serde_json::json!({"clauses": [{"title": "Scope", "body": "Deliver a website."}]});
+    let r = srv.create_document(Parameters(CreateInput {
+        title: None, format: Some("business:contract".into()), data: Some(data),
+    })).await;
+    let h = json(&r)["handle"].as_str().expect("handle").to_string();
+    let text = json(&srv.to_plain_text(Parameters(ExportInput { document_handle: h })).await)["text"].as_str().unwrap().to_string();
+    assert!(text.contains("Deliver a website."), "clause missing: {text}");
+}

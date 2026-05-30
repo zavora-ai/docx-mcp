@@ -402,6 +402,50 @@ fn fmt_qty(q: f64) -> String {
     if q.fract() == 0.0 { format!("{}", q as i64) } else { format!("{}", q) }
 }
 
+/// A bordered Description/Qty/Unit Price/Amount table with an auto-summed
+/// total row (`total_label` names it, e.g. "TOTAL" or "PAID"). Reused by
+/// invoice-like documents (quote, purchase order, receipt).
+fn priced_items_table(doc: &mut Document, f: &Fields, accent: &str, total_label: &str) {
+    use zavora_docx::BorderStyle;
+    let items = f.arr("items");
+    let n = items.len().max(4);
+    let mut t = doc.add_table(n + 2, 4)
+        .borders(BorderStyle::Single, 4, "D0D0D0")
+        .column_widths(&[Length::inches(3.4), Length::inches(0.8), Length::inches(1.2), Length::inches(1.2)]);
+    t.header_row_style(accent, "FFFFFF");
+    cell_text(&mut t, 0, 0, "Description", Alignment::Left, true);
+    cell_text(&mut t, 0, 1, "Qty", Alignment::Center, true);
+    cell_text(&mut t, 0, 2, "Unit Price", Alignment::Right, true);
+    cell_text(&mut t, 0, 3, "Amount", Alignment::Right, true);
+    let mut total = 0.0;
+    for r in 1..=n {
+        match items.get(r - 1) {
+            Some(it) => {
+                let qty = it.get("qty").and_then(|v| v.as_f64()).unwrap_or(1.0);
+                let price = it.get("price").and_then(|v| v.as_f64()).unwrap_or(0.0);
+                let amount = it.get("amount").and_then(|v| v.as_f64()).unwrap_or(qty * price);
+                total += amount;
+                cell_text(&mut t, r, 0, jstr(it, "description", "[Item or service description]"), Alignment::Left, false);
+                cell_text(&mut t, r, 1, &fmt_qty(qty), Alignment::Center, false);
+                cell_text(&mut t, r, 2, &money(price), Alignment::Right, false);
+                cell_text(&mut t, r, 3, &money(amount), Alignment::Right, false);
+            }
+            None => {
+                cell_text(&mut t, r, 0, "[Item or service description]", Alignment::Left, false);
+                cell_text(&mut t, r, 1, "1", Alignment::Center, false);
+                cell_text(&mut t, r, 2, "$0.00", Alignment::Right, false);
+                cell_text(&mut t, r, 3, "$0.00", Alignment::Right, false);
+            }
+        }
+    }
+    let tr = n + 1;
+    for col in 0..4 {
+        if let Some(c) = t.cell(tr, col) { c.shading("EFEFEF"); }
+    }
+    cell_text(&mut t, tr, 2, total_label, Alignment::Right, true);
+    cell_text(&mut t, tr, 3, &if items.is_empty() { "$0.00".into() } else { money(total) }, Alignment::Right, true);
+}
+
 /// Business report: title page-style header, sections scaffold, page numbers.
 pub fn create_business_report(doc: &mut Document, f: &Fields) {
     business_base(doc, "Business Report", "2980B9", "Calibri", "Cambria");
@@ -522,7 +566,6 @@ pub fn create_memo(doc: &mut Document, f: &Fields) {
 /// Invoice: branded header, bill-to/meta blocks, a bordered line-items table
 /// with right-aligned currency, and an emphasized total row.
 pub fn create_invoice(doc: &mut Document, f: &Fields) {
-    use zavora_docx::BorderStyle;
     let accent = "1F6F54";
     business_base(doc, "Invoice", accent, "Calibri", "Calibri");
 
@@ -552,46 +595,7 @@ pub fn create_invoice(doc: &mut Document, f: &Fields) {
     doc.add_paragraph(&f.get("bill_to", "[Client Name · Company · Address]"));
     doc.add_paragraph("");
 
-    // Line items: bordered, sized columns, currency right-aligned.
-    let items = f.arr("items");
-    let n = items.len().max(4); // keep at least 4 rows for a usable scaffold
-    let mut t = doc.add_table(n + 2, 4)
-        .borders(BorderStyle::Single, 4, "D0D0D0")
-        .column_widths(&[Length::inches(3.4), Length::inches(0.8), Length::inches(1.2), Length::inches(1.2)]);
-    t.header_row_style(accent, "FFFFFF");
-    cell_text(&mut t, 0, 0, "Description", Alignment::Left, true);
-    cell_text(&mut t, 0, 1, "Qty", Alignment::Center, true);
-    cell_text(&mut t, 0, 2, "Unit Price", Alignment::Right, true);
-    cell_text(&mut t, 0, 3, "Amount", Alignment::Right, true);
-    let mut total = 0.0;
-    for r in 1..=n {
-        match items.get(r - 1) {
-            Some(it) => {
-                let qty = it.get("qty").and_then(|v| v.as_f64()).unwrap_or(1.0);
-                let price = it.get("price").and_then(|v| v.as_f64()).unwrap_or(0.0);
-                let amount = it.get("amount").and_then(|v| v.as_f64()).unwrap_or(qty * price);
-                total += amount;
-                cell_text(&mut t, r, 0, jstr(it, "description", "[Item or service description]"), Alignment::Left, false);
-                cell_text(&mut t, r, 1, &fmt_qty(qty), Alignment::Center, false);
-                cell_text(&mut t, r, 2, &money(price), Alignment::Right, false);
-                cell_text(&mut t, r, 3, &money(amount), Alignment::Right, false);
-            }
-            None => {
-                cell_text(&mut t, r, 0, "[Item or service description]", Alignment::Left, false);
-                cell_text(&mut t, r, 1, "1", Alignment::Center, false);
-                cell_text(&mut t, r, 2, "$0.00", Alignment::Right, false);
-                cell_text(&mut t, r, 3, "$0.00", Alignment::Right, false);
-            }
-        }
-    }
-    // Emphasized total row (shaded + bold), label right-aligned.
-    let total_row = n + 1;
-    for col in 0..4 {
-        if let Some(c) = t.cell(total_row, col) { c.shading("EFEFEF"); }
-    }
-    cell_text(&mut t, total_row, 2, "TOTAL", Alignment::Right, true);
-    let total_str = if items.is_empty() { "$0.00".to_string() } else { money(total) };
-    cell_text(&mut t, total_row, 3, &total_str, Alignment::Right, true);
+    priced_items_table(doc, f, accent, "TOTAL");
 
     doc.add_paragraph("");
     {
@@ -801,6 +805,244 @@ pub fn create_certificate(doc: &mut Document, f: &Fields) {
     cell_text(&mut t, 0, 1, f.get("signature", "[Signature]").as_str(), Alignment::Center, false);
     cell_text(&mut t, 1, 0, "Date", Alignment::Center, true);
     cell_text(&mut t, 1, 1, "Authorized by", Alignment::Center, true);
+}
+
+/// Cover letter: sender/recipient block, salutation, persuasive body, closing.
+pub fn create_cover_letter(doc: &mut Document, f: &Fields) {
+    business_base(doc, "Cover Letter", "1A1A1A", "Cambria", "Cambria");
+    doc.add_paragraph(&f.get("name", "[Your Name]"));
+    doc.add_paragraph(&f.get("contact", "[email · phone · city]"));
+    doc.add_paragraph("");
+    doc.add_paragraph(&f.get("date", "[Date]"));
+    doc.add_paragraph("");
+    doc.add_paragraph(&f.get("recipient", "[Hiring Manager]"));
+    doc.add_paragraph(&f.get("company", "[Company]"));
+    doc.add_paragraph("");
+    doc.add_paragraph(&format!("Dear {},", f.get("salutation", "Hiring Manager")));
+    doc.add_paragraph("");
+    doc.add_paragraph(&f.get("opening", "[State the role you're applying for and a one-line hook.]"));
+    doc.add_paragraph(&f.get("body", "[Why you're a fit — relevant achievements and skills.]"));
+    doc.add_paragraph(&f.get("closing", "[Reiterate interest and invite next steps.]"));
+    doc.add_paragraph("");
+    doc.add_paragraph("Sincerely,");
+    doc.add_paragraph("");
+    doc.add_paragraph(&f.get("name", "[Your Name]"));
+}
+
+/// Fax cover sheet: ruled header + labeled routing table + note.
+pub fn create_fax_cover(doc: &mut Document, f: &Fields) {
+    let accent = "404040";
+    business_base(doc, "Fax", accent, "Calibri", "Calibri");
+    section_rule(doc, "Fax", accent);
+    let mut t = doc.add_table(6, 2)
+        .column_widths(&[Length::inches(1.2), Length::inches(5.3)]);
+    let rows = [
+        ("TO:", f.get("to", "[ ... ]")), ("FROM:", f.get("from", "[ ... ]")),
+        ("FAX:", f.get("fax", "[ ... ]")), ("PHONE:", f.get("phone", "[ ... ]")),
+        ("DATE:", f.get("date", "[ ... ]")), ("PAGES:", f.get("pages", "[ ... ]")),
+    ];
+    for (i, (k, v)) in rows.iter().enumerate() {
+        cell_text(&mut t, i, 0, k, Alignment::Left, true);
+        cell_text(&mut t, i, 1, v, Alignment::Left, false);
+    }
+    section_rule(doc, "Message", accent);
+    doc.add_paragraph(&f.get("message", "[Note to the recipient.]"));
+}
+
+/// Price quote: company/meta/bill-to + priced items with a quoted TOTAL.
+pub fn create_quote(doc: &mut Document, f: &Fields) {
+    let accent = "2471A3";
+    business_base(doc, "Quote", accent, "Calibri", "Calibri");
+    {
+        let mut p = doc.add_paragraph("");
+        p.add_run(&f.get("company", "[Your Company]")).bold(true).size(15.0).color(accent);
+    }
+    doc.add_paragraph(&f.get("company_details", "[Address · email · phone]"));
+    doc.add_paragraph("QUOTE").style("Heading1");
+    {
+        let mut m = doc.add_table(3, 2).column_widths(&[Length::inches(1.2), Length::inches(2.0)]);
+        let meta = [("Quote #", f.get("number", "[0001]")), ("Date", f.get("date", "[Date]")), ("Valid until", f.get("valid_until", "[Date]"))];
+        for (i, (k, v)) in meta.iter().enumerate() {
+            cell_text(&mut m, i, 0, k, Alignment::Left, true);
+            cell_text(&mut m, i, 1, v, Alignment::Left, false);
+        }
+    }
+    doc.add_paragraph("");
+    { let mut p = doc.add_paragraph(""); p.add_run("Prepared For").bold(true).color(accent); }
+    doc.add_paragraph(&f.get("client", "[Client · Company · Address]"));
+    doc.add_paragraph("");
+    priced_items_table(doc, f, accent, "TOTAL");
+    doc.add_paragraph("");
+    { let mut p = doc.add_paragraph(""); p.add_run("Notes: ").bold(true); p.add_run(&f.get("notes", "Prices valid for 30 days. Taxes not included.")); }
+}
+
+/// Purchase order: vendor/ship-to blocks + priced items with a PO total.
+pub fn create_purchase_order(doc: &mut Document, f: &Fields) {
+    let accent = "1F6F54";
+    business_base(doc, "Purchase Order", accent, "Calibri", "Calibri");
+    {
+        let mut p = doc.add_paragraph("");
+        p.add_run(&f.get("company", "[Your Company]")).bold(true).size(15.0).color(accent);
+    }
+    doc.add_paragraph("PURCHASE ORDER").style("Heading1");
+    {
+        let mut m = doc.add_table(2, 2).column_widths(&[Length::inches(1.2), Length::inches(2.0)]);
+        let meta = [("PO #", f.get("number", "[0001]")), ("Date", f.get("date", "[Date]"))];
+        for (i, (k, v)) in meta.iter().enumerate() {
+            cell_text(&mut m, i, 0, k, Alignment::Left, true);
+            cell_text(&mut m, i, 1, v, Alignment::Left, false);
+        }
+    }
+    doc.add_paragraph("");
+    { let mut p = doc.add_paragraph(""); p.add_run("Vendor").bold(true).color(accent); }
+    doc.add_paragraph(&f.get("vendor", "[Vendor · Address]"));
+    { let mut p = doc.add_paragraph(""); p.add_run("Ship To").bold(true).color(accent); }
+    doc.add_paragraph(&f.get("ship_to", "[Recipient · Address]"));
+    doc.add_paragraph("");
+    priced_items_table(doc, f, accent, "TOTAL");
+    doc.add_paragraph("");
+    { let mut p = doc.add_paragraph(""); p.add_run("Terms: ").bold(true); p.add_run(&f.get("terms", "Deliver by [date]. Reference this PO number on all correspondence.")); }
+}
+
+/// Payment receipt: receipt meta + priced items showing amount PAID.
+pub fn create_receipt(doc: &mut Document, f: &Fields) {
+    let accent = "117864";
+    business_base(doc, "Receipt", accent, "Calibri", "Calibri");
+    {
+        let mut p = doc.add_paragraph("");
+        p.add_run(&f.get("company", "[Your Company]")).bold(true).size(15.0).color(accent);
+    }
+    doc.add_paragraph("RECEIPT").style("Heading1");
+    {
+        let mut m = doc.add_table(3, 2).column_widths(&[Length::inches(1.4), Length::inches(2.0)]);
+        let meta = [("Receipt #", f.get("number", "[0001]")), ("Date", f.get("date", "[Date]")), ("Method", f.get("method", "[Card / Cash]"))];
+        for (i, (k, v)) in meta.iter().enumerate() {
+            cell_text(&mut m, i, 0, k, Alignment::Left, true);
+            cell_text(&mut m, i, 1, v, Alignment::Left, false);
+        }
+    }
+    doc.add_paragraph("");
+    { let mut p = doc.add_paragraph(""); p.add_run("Received From").bold(true).color(accent); }
+    doc.add_paragraph(&f.get("payer", "[Payer name]"));
+    doc.add_paragraph("");
+    priced_items_table(doc, f, accent, "PAID");
+    doc.add_paragraph("");
+    doc.add_paragraph(&f.get("note", "Thank you for your payment.")).alignment(Alignment::Center);
+}
+
+/// Event flyer: large centered headline, subhead, ruled details, and call-out.
+pub fn create_flyer(doc: &mut Document, f: &Fields) {
+    let accent = "C0392B";
+    business_base(doc, "Flyer", accent, "Arial", "Arial");
+    for _ in 0..2 { doc.add_paragraph(""); }
+    doc.add_paragraph(&f.get("headline", "EVENT TITLE").to_uppercase()).style("Heading1").alignment(Alignment::Center);
+    { let mut p = doc.add_paragraph("").alignment(Alignment::Center); p.add_run(&f.get("subhead", "[Catchy one-liner]")).italic(true).size(15.0); }
+    doc.add_paragraph("");
+    for (label, key, dflt) in [("When", "when", "[Date · Time]"), ("Where", "where", "[Venue · Address]"), ("Details", "details", "[What to expect]")] {
+        let mut p = doc.add_paragraph("").alignment(Alignment::Center);
+        p.add_run(&format!("{}: ", label)).bold(true).color(accent);
+        p.add_run(&f.get(key, dflt));
+    }
+    doc.add_paragraph("");
+    { let mut p = doc.add_paragraph("").alignment(Alignment::Center); p.add_run(&f.get("cta", "RSVP at [email / link]")).bold(true).size(14.0).color(accent); }
+}
+
+/// Contract / agreement: title, parties, numbered clauses, signature blocks.
+pub fn create_contract(doc: &mut Document, f: &Fields) {
+    let accent = "1A1A1A";
+    business_base(doc, "Agreement", accent, "Times New Roman", "Times New Roman");
+    doc.set_footer_page_number();
+    doc.add_paragraph(&f.get("title", "SERVICE AGREEMENT").to_uppercase()).style("Heading1").alignment(Alignment::Center);
+    doc.add_paragraph(&format!("This agreement is made on {} between {} (\"Provider\") and {} (\"Client\").",
+        f.get("date", "[Date]"), f.get("party_a", "[Party A]"), f.get("party_b", "[Party B]")));
+    doc.add_paragraph("");
+    let clauses = f.arr("clauses");
+    if clauses.is_empty() {
+        for (h, b) in [("Scope", "[Describe the services provided.]"), ("Payment", "[Fees, schedule, and method.]"),
+            ("Term & Termination", "[Duration and how either party may end the agreement.]"),
+            ("Confidentiality", "[Treatment of confidential information.]"),
+            ("Governing Law", "[Jurisdiction whose laws apply.]")] {
+            doc.add_numbered_list_item(&format!("{}. {}", h, b), 0);
+        }
+    } else {
+        for c in clauses {
+            let title = jstr(c, "title", "");
+            let body = jstr(c, "body", "");
+            let line = if title.is_empty() { body.to_string() } else { format!("{}. {}", title, body) };
+            doc.add_numbered_list_item(&line, 0);
+        }
+    }
+    doc.add_paragraph("");
+    let mut t = doc.add_table(2, 2).column_widths(&[Length::inches(3.25), Length::inches(3.25)]);
+    cell_text(&mut t, 0, 0, "_______________________", Alignment::Left, false);
+    cell_text(&mut t, 0, 1, "_______________________", Alignment::Left, false);
+    cell_text(&mut t, 1, 0, &f.get("party_a", "Provider"), Alignment::Left, true);
+    cell_text(&mut t, 1, 1, &f.get("party_b", "Client"), Alignment::Left, true);
+}
+
+/// Meeting minutes: meta block, attendees, ruled discussion, and action items.
+pub fn create_meeting_minutes(doc: &mut Document, f: &Fields) {
+    let accent = "2C3E50";
+    business_base(doc, "Minutes", accent, "Calibri", "Calibri");
+    doc.add_paragraph(&f.get("title", "MEETING MINUTES").to_uppercase()).style("Heading1").alignment(Alignment::Center);
+    let mut t = doc.add_table(3, 2).column_widths(&[Length::inches(1.2), Length::inches(5.3)]);
+    let meta = [("Date", f.get("date", "[Date]")), ("Time", f.get("time", "[Time]")), ("Location", f.get("location", "[Location]"))];
+    for (i, (k, v)) in meta.iter().enumerate() {
+        cell_text(&mut t, i, 0, k, Alignment::Left, true);
+        cell_text(&mut t, i, 1, v, Alignment::Left, false);
+    }
+    doc.add_paragraph(&format!("Attendees: {}", f.get("attendees", "[Names]")));
+    section_rule(doc, "Discussion", accent);
+    doc.add_paragraph(&f.get("discussion", "[Topics discussed and decisions reached.]"));
+    section_rule(doc, "Action Items", accent);
+    let actions = f.arr("actions");
+    if actions.is_empty() {
+        doc.add_bullet_list_item("[Owner — task — due date]", 0);
+    } else {
+        for a in actions {
+            if let Some(s) = a.as_str() { doc.add_bullet_list_item(s, 0); }
+        }
+    }
+}
+
+/// Sign-in sheet: title + a bordered grid (Name / Organization / Time / Signature).
+pub fn create_sign_in_sheet(doc: &mut Document, f: &Fields) {
+    use zavora_docx::BorderStyle;
+    let accent = "34495E";
+    business_base(doc, "Sign-In Sheet", accent, "Calibri", "Calibri");
+    doc.add_paragraph(&f.get("title", "SIGN-IN SHEET").to_uppercase()).style("Heading1").alignment(Alignment::Center);
+    doc.add_paragraph(&format!("{} · {}", f.get("event", "[Event]"), f.get("date", "[Date]"))).alignment(Alignment::Center);
+    doc.add_paragraph("");
+    let rows = 16usize;
+    let mut t = doc.add_table(rows, 4)
+        .borders(BorderStyle::Single, 4, "B0B0B0")
+        .column_widths(&[Length::inches(2.2), Length::inches(2.0), Length::inches(1.0), Length::inches(1.3)]);
+    t.header_row_style(accent, "FFFFFF");
+    for (c, h) in ["Name", "Organization", "Time", "Signature"].iter().enumerate() {
+        cell_text(&mut t, 0, c, h, Alignment::Left, true);
+    }
+}
+
+/// Business plan: title page-style header, page numbers, standard sections.
+pub fn create_business_plan(doc: &mut Document, f: &Fields) {
+    let accent = "6C3483";
+    business_base(doc, "Business Plan", accent, "Calibri", "Cambria");
+    doc.set_footer_page_number();
+    doc.add_paragraph(&f.get("company", "COMPANY NAME").to_uppercase()).style("Heading1").alignment(Alignment::Center);
+    doc.add_paragraph(&f.get("tagline", "Business Plan")).alignment(Alignment::Center);
+    doc.add_paragraph(&f.get("date", "[Date]")).alignment(Alignment::Center);
+    for (h, key, dflt) in [
+        ("Executive Summary", "summary", "[The business in brief — what, who, and why now.]"),
+        ("Company Description", "description", "[Mission, structure, and offering.]"),
+        ("Market Analysis", "market", "[Target market, size, and competition.]"),
+        ("Organization & Management", "organization", "[Team and roles.]"),
+        ("Products & Services", "products", "[What you sell and the value.]"),
+        ("Marketing & Sales", "marketing", "[How you reach and convert customers.]"),
+        ("Financial Plan", "financials", "[Projections, funding needs, and milestones.]"),
+    ] {
+        section_rule(doc, h, accent);
+        doc.add_paragraph(&f.get(key, dflt));
+    }
 }
 
 // ── Paragraph helpers ────────────────────────────────────────────────────────

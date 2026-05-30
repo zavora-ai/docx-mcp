@@ -594,7 +594,7 @@ macro_rules! with_doc {
 
 #[tool_router(server_handler)]
 impl DocxServer {
-    #[tool(description = "Create a new DOCX document. KDP book formats: 'kdp:technical' (6x9), 'kdp:novel' (5.25x8), 'kdp:cookbook' (8x10), 'kdp:children' (8.5x8.5), 'kdp:interior_design' (8.5x11), 'kdp:encyclopedia' (8.5x11 2-col), 'kdp:manga' (5x7.5). Business/professional formats (US Letter, themed, with seeded scaffold): 'business:report', 'business:resume', 'business:letter', 'business:memo', 'business:invoice', 'business:newsletter', 'business:academic', 'business:proposal', 'business:agenda', 'business:press_release', 'business:certificate'. Omit format for a blank document.")]
+    #[tool(description = "Create a new DOCX document. KDP book formats: 'kdp:technical' (6x9), 'kdp:novel' (5.25x8), 'kdp:cookbook' (8x10), 'kdp:children' (8.5x8.5), 'kdp:interior_design' (8.5x11), 'kdp:encyclopedia' (8.5x11 2-col), 'kdp:manga' (5x7.5). Business/professional formats (US Letter, themed, with seeded scaffold): 'business:report', 'business:resume', 'business:letter', 'business:memo', 'business:invoice', 'business:newsletter', 'business:academic', 'business:proposal', 'business:agenda', 'business:press_release', 'business:certificate', 'business:cover_letter', 'business:fax_cover', 'business:quote', 'business:purchase_order', 'business:receipt', 'business:flyer', 'business:contract', 'business:meeting_minutes', 'business:sign_in_sheet', 'business:business_plan'. Omit format for a blank document.")]
     pub async fn create_document(&self, Parameters(input): Parameters<CreateInput>) -> String {
         let mut doc = zavora_docx::Document::new();
         let data = input.data.clone().unwrap_or(serde_json::Value::Null);
@@ -618,6 +618,16 @@ impl DocxServer {
             Some("business:agenda") => engine::create_agenda(&mut doc, &f),
             Some("business:press_release") => engine::create_press_release(&mut doc, &f),
             Some("business:certificate") => engine::create_certificate(&mut doc, &f),
+            Some("business:cover_letter") => engine::create_cover_letter(&mut doc, &f),
+            Some("business:fax_cover") => engine::create_fax_cover(&mut doc, &f),
+            Some("business:quote") => engine::create_quote(&mut doc, &f),
+            Some("business:purchase_order") => engine::create_purchase_order(&mut doc, &f),
+            Some("business:receipt") => engine::create_receipt(&mut doc, &f),
+            Some("business:flyer") => engine::create_flyer(&mut doc, &f),
+            Some("business:contract") => engine::create_contract(&mut doc, &f),
+            Some("business:meeting_minutes") => engine::create_meeting_minutes(&mut doc, &f),
+            Some("business:sign_in_sheet") => engine::create_sign_in_sheet(&mut doc, &f),
+            Some("business:business_plan") => engine::create_business_plan(&mut doc, &f),
             _ => {}
         }
         let mut store = self.store.lock().await;
