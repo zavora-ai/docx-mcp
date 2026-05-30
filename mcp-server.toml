@@ -312,6 +312,27 @@ requires_approval = false
 credential_bindings = []
 
 [[tools]]
+name = "embed_font"
+description = "Embed a font file (.ttf/.otf) in the document so it travels with the file. Provide the font family name and a path to the font file. Stor..."
+risk_class = "local_write"
+requires_approval = false
+credential_bindings = []
+
+[[tools]]
+name = "add_building_block"
+description = "Add a reusable building block (Quick Part) by name with plain-text content, stored in the glossary document. Available for insertion in W..."
+risk_class = "local_write"
+requires_approval = false
+credential_bindings = []
+
+[[tools]]
+name = "add_custom_xml"
+description = "Attach a custom XML data part (arbitrary XML) to the document, with a datastore itemProps part for content-control data binding."
+risk_class = "local_write"
+requires_approval = false
+credential_bindings = []
+
+[[tools]]
 name = "get_metadata"
 description = "Get document metadata: title, author, subject, keywords, word count."
 risk_class = "read_only"

@@ -358,6 +358,31 @@ pub struct SetMetadataInput {
 }
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct EmbedFontInput {
+    pub document_handle: String,
+    /// Font family name as referenced in styles (e.g. "MyFont").
+    pub family: String,
+    /// Path to a .ttf/.otf font file to embed.
+    pub font_path: String,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct BuildingBlockInput {
+    pub document_handle: String,
+    /// Building block (Quick Part) name.
+    pub name: String,
+    /// Plain-text content of the building block.
+    pub content: String,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct CustomXmlInput {
+    pub document_handle: String,
+    /// Arbitrary XML to attach as a custom XML data part.
+    pub xml: String,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
 pub struct MergeDocumentsInput {
     pub document_handle: String,
     /// Path to the document to append
@@ -1222,6 +1247,34 @@ impl DocxServer {
             if let Some(c) = &input.company { doc.set_company(c); }
             if let Some(a) = &input.application { doc.set_application(a); }
             serde_json::json!({"set": true}).to_string()
+        })
+    }
+
+    #[tool(description = "Embed a font file (.ttf/.otf) in the document so it travels with the file. Provide the font family name and a path to the font file. Stored obfuscated per the OOXML embedded-font scheme.")]
+    async fn embed_font(&self, Parameters(input): Parameters<EmbedFontInput>) -> String {
+        let data = match std::fs::read(&input.font_path) {
+            Ok(d) => d,
+            Err(e) => return serde_json::json!({"error": e.to_string()}).to_string(),
+        };
+        with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
+            doc.embed_font(&input.family, &data);
+            serde_json::json!({"embedded": true, "family": input.family}).to_string()
+        })
+    }
+
+    #[tool(description = "Add a reusable building block (Quick Part) by name with plain-text content, stored in the glossary document. Available for insertion in Word's Quick Parts gallery.")]
+    async fn add_building_block(&self, Parameters(input): Parameters<BuildingBlockInput>) -> String {
+        with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
+            doc.add_building_block(&input.name, &input.content);
+            serde_json::json!({"added": true, "name": input.name}).to_string()
+        })
+    }
+
+    #[tool(description = "Attach a custom XML data part (arbitrary XML) to the document, with a datastore itemProps part for content-control data binding.")]
+    async fn add_custom_xml(&self, Parameters(input): Parameters<CustomXmlInput>) -> String {
+        with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
+            doc.add_custom_xml(&input.xml);
+            serde_json::json!({"added": true}).to_string()
         })
     }
 
