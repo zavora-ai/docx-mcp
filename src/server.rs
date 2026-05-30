@@ -130,6 +130,13 @@ pub struct TocInput {
 }
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct EquationInput {
+    pub document_handle: String,
+    /// LaTeX-subset equation, e.g. "\\frac{a}{b}^2", "\\sum_{i=1}^{n} i", "\\sqrt{x}".
+    pub latex: String,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
 pub struct ContentControlInput {
     pub document_handle: String,
     /// Control kind: "text", "rich_text", "dropdown", "combo", "date", "checkbox".
@@ -743,6 +750,14 @@ impl DocxServer {
                 other => return serde_json::json!({"error": format!("unknown kind: {other}")}).to_string(),
             };
             doc.add_content_control(kind, &input.tag, input.placeholder.as_deref());
+            serde_json::json!({"added": true}).to_string()
+        })
+    }
+
+    #[tool(description = "Add a block-level mathematical equation from a LaTeX-subset string. Supports \\frac{}{}, ^ and _ (superscript/subscript), \\sqrt{} and \\sqrt[n]{}, \\sum/\\int/\\prod with _/^ limits, \\left(...\\right), functions (\\sin, \\cos, \\log, \\ln, \\lim), Greek letters (\\alpha, \\beta, \\pi, ...), and operators (\\cdot, \\times, \\pm, \\leq, \\geq, \\infty, \\to). Renders as a real editable Word equation (OMML).")]
+    async fn add_equation(&self, Parameters(input): Parameters<EquationInput>) -> String {
+        with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
+            doc.add_equation_latex(&input.latex);
             serde_json::json!({"added": true}).to_string()
         })
     }
