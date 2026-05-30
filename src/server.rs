@@ -297,6 +297,9 @@ pub struct DeleteInput { pub document_handle: String, pub index: usize }
 pub struct UpdateParaInput { pub document_handle: String, pub index: usize, pub text: String }
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
 pub struct RunFormatInput { pub document_handle: String, pub paragraph_index: usize, pub text: String, pub bold: Option<bool>, pub italic: Option<bool>, pub underline: Option<bool>, pub font: Option<String>, pub size: Option<f64>, pub color: Option<String> }
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct FieldInput { pub document_handle: String, pub paragraph_index: usize, pub instruction: String, pub cached: Option<String> }
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
 pub struct ParaFormatInput { pub document_handle: String, pub index: usize, pub alignment: Option<String>, pub space_before: Option<f64>, pub space_after: Option<f64>, pub line_spacing: Option<f64> }
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
@@ -1055,6 +1058,19 @@ impl DocxServer {
                     if input.underline.unwrap_or(false) { run = run.underline(true); }
                     if let Some(c) = &input.color { run.color(c); }
                     serde_json::json!({"added": true, "paragraph_index": input.paragraph_index}).to_string()
+                }
+                None => serde_json::json!({"error": "INDEX_OUT_OF_BOUNDS"}).to_string(),
+            }
+        })
+    }
+
+    #[tool(description = "Add a Word field to a paragraph. instruction is the field code, e.g. 'DATE \\\\@ \"yyyy-MM-dd\"', 'REF bookmarkName', 'SEQ Figure \\\\* ARABIC', 'STYLEREF \"Heading 1\"', 'PAGE', 'NUMPAGES'. Optional cached result text. Word recomputes fields on open when update-fields is enabled (see set_document_settings update_fields).")]
+    async fn add_field(&self, Parameters(input): Parameters<FieldInput>) -> String {
+        with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
+            match doc.paragraph_mut(input.paragraph_index) {
+                Some(mut para) => {
+                    para.add_field(&input.instruction, input.cached.as_deref());
+                    serde_json::json!({"added": true}).to_string()
                 }
                 None => serde_json::json!({"error": "INDEX_OUT_OF_BOUNDS"}).to_string(),
             }
