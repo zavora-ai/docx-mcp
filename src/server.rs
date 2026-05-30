@@ -450,6 +450,12 @@ pub struct CommentInput { pub document_handle: String, pub id: u32, pub author: 
 pub struct CommentRangeInput { pub document_handle: String, pub paragraph_index: usize, pub comment_id: u32, pub commented_text: String }
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct CommentReplyInput { pub document_handle: String, pub id: u32, pub parent_id: u32, pub author: String, pub text: String }
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct ResolveCommentInput { pub document_handle: String, pub id: u32 }
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
 pub struct WatermarkInput { pub document_handle: String, pub text: String, /// Hex color e.g. "C0C0C0"
     pub color: Option<String>, /// Rotation in degrees (default -45)
     pub rotation: Option<i32> }
@@ -1451,6 +1457,22 @@ impl DocxServer {
                 }
                 None => serde_json::json!({"error": "INDEX_OUT_OF_BOUNDS"}).to_string(),
             }
+        })
+    }
+
+    #[tool(description = "Add a threaded reply to an existing comment. Provide a new unique id, the parent_id of the comment being replied to, author, and text.")]
+    async fn reply_to_comment(&self, Parameters(input): Parameters<CommentReplyInput>) -> String {
+        with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
+            doc.add_comment_reply(input.id, input.parent_id, &input.author, &input.text);
+            serde_json::json!({"added": true, "comment_id": input.id}).to_string()
+        })
+    }
+
+    #[tool(description = "Mark a comment (by id) as resolved/done.")]
+    async fn resolve_comment(&self, Parameters(input): Parameters<ResolveCommentInput>) -> String {
+        with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
+            doc.resolve_comment(input.id);
+            serde_json::json!({"resolved": true, "comment_id": input.id}).to_string()
         })
     }
 
