@@ -332,6 +332,42 @@ fn heading(doc: &mut Document, level: u32, text: &str) {
     doc.add_paragraph(text).style(&format!("Heading{level}"));
 }
 
+/// Set a table cell's text with alignment and optional bold, replacing the
+/// default empty paragraph so the alignment actually applies.
+fn cell_text(t: &mut zavora_docx::Table, row: usize, col: usize, text: &str, align: Alignment, bold: bool) {
+    if let Some(mut c) = t.cell(row, col) {
+        c.remove_first_empty_paragraph();
+        let mut p = c.add_paragraph("").alignment(align);
+        let r = p.add_run(text);
+        if bold { r.bold(true); }
+    }
+}
+
+/// A resume-style section heading: bold all-caps accent label with a hairline
+/// rule underneath, for clean visual separation between sections.
+fn section_rule(doc: &mut Document, text: &str, accent: &str) {
+    use zavora_docx::BorderStyle;
+    let mut p = doc
+        .add_paragraph("")
+        .space_before(Length::pt(12.0))
+        .space_after(Length::pt(4.0))
+        .border_bottom(BorderStyle::Single, 6, accent);
+    p.add_run(text).bold(true).size(12.0).color(accent).all_caps(true);
+}
+
+/// A two-part line: `left` left-aligned, `right` pushed to a right tab stop at
+/// `right_edge` inches — for "Title — Company .... Dates".
+fn dated_entry(doc: &mut Document, left: &str, left_bold: bool, right: &str, right_edge: f64) {
+    use zavora_docx::TabAlignment;
+    let mut p = doc.add_paragraph("").add_tab_stop(TabAlignment::Right, Length::inches(right_edge));
+    {
+        let l = p.add_run(left);
+        if left_bold { l.bold(true); }
+    }
+    p.add_tab();
+    p.add_run(right).italic(true);
+}
+
 /// Business report: title page-style header, sections scaffold, page numbers.
 pub fn create_business_report(doc: &mut Document) {
     business_base(doc, "Business Report", "2980B9", "Calibri", "Cambria");
@@ -340,40 +376,47 @@ pub fn create_business_report(doc: &mut Document) {
     doc.add_paragraph("Subtitle / Reporting Period").alignment(Alignment::Center);
     doc.add_paragraph("Prepared by: [Author] · [Date]").alignment(Alignment::Center);
     doc.add_paragraph("");
-    heading(doc, 2, "Executive Summary");
+    let accent = "2980B9";
+    section_rule(doc, "Executive Summary", accent);
     doc.add_paragraph("[Summarize the report's key findings and recommendations.]");
-    heading(doc, 2, "Introduction");
+    section_rule(doc, "Introduction", accent);
     doc.add_paragraph("[Background and objectives.]");
-    heading(doc, 2, "Findings");
+    section_rule(doc, "Findings", accent);
     doc.add_paragraph("[Present your analysis and data.]");
-    heading(doc, 2, "Recommendations");
+    section_rule(doc, "Recommendations", accent);
     doc.add_paragraph("[Actionable next steps.]");
-    heading(doc, 2, "Conclusion");
+    section_rule(doc, "Conclusion", accent);
     doc.add_paragraph("[Closing remarks.]");
 }
 
-/// Resume / CV: name header, contact line, and standard sections.
+/// Resume / CV: name header, contact line, ruled sections, tab-aligned dates,
+/// and proper bulleted accomplishments.
 pub fn create_resume(doc: &mut Document) {
-    business_base(doc, "Resume", "2C3E50", "Calibri", "Calibri");
+    let accent = "1F3A5F";
+    business_base(doc, "Resume", accent, "Calibri", "Calibri");
     doc.set_margins(Length::inches(0.75), Length::inches(0.75), Length::inches(0.75), Length::inches(0.75));
+    let edge = 7.0; // 8.5" - 2×0.75" printable width
+
     doc.add_paragraph("YOUR NAME").style("Heading1").alignment(Alignment::Center);
     doc.add_paragraph("City, State · email@example.com · (555) 555-5555 · linkedin.com/in/you")
         .alignment(Alignment::Center);
-    doc.add_paragraph("");
-    heading(doc, 2, "Professional Summary");
-    doc.add_paragraph("[2-3 sentence summary of your experience and strengths.]");
-    heading(doc, 2, "Experience");
-    {
-        let mut p = doc.add_paragraph("");
-        p.add_run("Job Title — Company").bold(true);
-        p.add_run("    [Dates]").italic(true);
-    }
-    doc.add_paragraph("• [Accomplishment with a measurable result.]");
-    doc.add_paragraph("• [Accomplishment with a measurable result.]");
-    heading(doc, 2, "Education");
-    doc.add_paragraph("Degree, Institution — [Year]");
-    heading(doc, 2, "Skills");
-    doc.add_paragraph("[Skill] · [Skill] · [Skill] · [Skill]");
+
+    section_rule(doc, "Professional Summary", accent);
+    doc.add_paragraph("[2-3 sentence summary of your experience, strengths, and target role.]");
+
+    section_rule(doc, "Experience", accent);
+    dated_entry(doc, "Job Title — Company", true, "[Start – End]", edge);
+    { doc.add_paragraph("").add_run("[City, State]").italic(true); }
+    doc.add_bullet_list_item("[Accomplishment with a measurable result — e.g. grew X by 30%.]", 0);
+    doc.add_bullet_list_item("[Accomplishment demonstrating ownership and impact.]", 0);
+    dated_entry(doc, "Previous Title — Company", true, "[Start – End]", edge);
+    doc.add_bullet_list_item("[Key contribution or initiative led.]", 0);
+
+    section_rule(doc, "Education", accent);
+    dated_entry(doc, "Degree, Institution", true, "[Year]", edge);
+
+    section_rule(doc, "Skills", accent);
+    doc.add_paragraph("[Skill] · [Skill] · [Skill] · [Skill] · [Skill] · [Skill]");
 }
 
 /// Business letter: block format with sender/recipient/date/salutation/body/closing.
@@ -400,14 +443,16 @@ pub fn create_letter(doc: &mut Document) {
     doc.add_paragraph("[Your Name]");
 }
 
-/// Memo: standard TO/FROM/DATE/RE header block plus body.
+/// Memo: ruled MEMORANDUM header + sized TO/FROM/DATE/RE block + body.
 pub fn create_memo(doc: &mut Document) {
-    business_base(doc, "Memo", "404040", "Calibri", "Calibri");
-    doc.add_paragraph("MEMORANDUM").style("Heading1");
-    let mut t = doc.add_table(4, 2);
+    let accent = "404040";
+    business_base(doc, "Memo", accent, "Calibri", "Calibri");
+    section_rule(doc, "Memorandum", accent);
+    let mut t = doc.add_table(4, 2)
+        .column_widths(&[Length::inches(1.0), Length::inches(5.5)]);
     for (i, label) in ["TO:", "FROM:", "DATE:", "RE:"].iter().enumerate() {
-        if let Some(mut c) = t.cell(i, 0) { c.set_text(label); }
-        if let Some(mut c) = t.cell(i, 1) { c.set_text("[ ... ]"); }
+        cell_text(&mut t, i, 0, label, Alignment::Left, true);
+        cell_text(&mut t, i, 1, "[ ... ]", Alignment::Left, false);
     }
     doc.add_paragraph("");
     doc.add_paragraph("[Purpose of the memo in one line.]");
@@ -415,44 +460,87 @@ pub fn create_memo(doc: &mut Document) {
     doc.add_paragraph("[Closing — deadlines or contact for questions.]");
 }
 
-/// Invoice: header, bill-to, a line-items table, and a totals row.
+/// Invoice: branded header, bill-to/meta blocks, a bordered line-items table
+/// with right-aligned currency, and an emphasized total row.
 pub fn create_invoice(doc: &mut Document) {
-    business_base(doc, "Invoice", "27AE60", "Calibri", "Calibri");
+    use zavora_docx::BorderStyle;
+    let accent = "1F6F54";
+    business_base(doc, "Invoice", accent, "Calibri", "Calibri");
+
+    // Masthead: company on the left, big INVOICE wordmark established by Heading1.
+    {
+        let mut p = doc.add_paragraph("");
+        p.add_run("[Your Company]").bold(true).size(15.0).color(accent);
+    }
+    doc.add_paragraph("[Street Address · City, State ZIP · email@company.com · (555) 555-5555]");
     doc.add_paragraph("INVOICE").style("Heading1");
-    doc.add_paragraph("[Your Company] · [Address] · [email] · [phone]");
-    doc.add_paragraph("Invoice #: [0001]    Date: [Date]    Due: [Date]");
-    doc.add_paragraph("");
-    doc.add_paragraph("Bill To: [Client Name, Address]");
-    doc.add_paragraph("");
-    let mut t = doc.add_table(5, 4);
-    t.header_row_style("27AE60", "FFFFFF");
-    for (c, h) in ["Description", "Qty", "Unit Price", "Amount"].iter().enumerate() {
-        if let Some(mut cell) = t.cell(0, c) { cell.set_text(h); }
+
+    // Meta block: a borderless 2-col table puts label/value pairs on the right.
+    {
+        let mut m = doc.add_table(3, 2)
+            .column_widths(&[Length::inches(1.2), Length::inches(2.0)]);
+        for (i, (k, v)) in [("Invoice #", "[0001]"), ("Date", "[Date]"), ("Due", "[Date]")].iter().enumerate() {
+            cell_text(&mut m, i, 0, k, Alignment::Left, true);
+            cell_text(&mut m, i, 1, v, Alignment::Left, false);
+        }
     }
-    for r in 1..4 {
-        if let Some(mut cell) = t.cell(r, 0) { cell.set_text("[Item / service]"); }
-        if let Some(mut cell) = t.cell(r, 1) { cell.set_text("[1]"); }
-        if let Some(mut cell) = t.cell(r, 2) { cell.set_text("[$0.00]"); }
-        if let Some(mut cell) = t.cell(r, 3) { cell.set_text("[$0.00]"); }
-    }
-    if let Some(mut cell) = t.cell(4, 2) { cell.set_text("TOTAL"); }
-    if let Some(mut cell) = t.cell(4, 3) { cell.set_text("[$0.00]"); }
     doc.add_paragraph("");
-    doc.add_paragraph("Payment terms: [Net 30]. Make checks payable to [Your Company].");
+    {
+        let mut p = doc.add_paragraph("");
+        p.add_run("Bill To").bold(true).color(accent);
+    }
+    doc.add_paragraph("[Client Name · Company · Address]");
+    doc.add_paragraph("");
+
+    // Line items: bordered, sized columns, currency right-aligned.
+    let mut t = doc.add_table(6, 4)
+        .borders(BorderStyle::Single, 4, "D0D0D0")
+        .column_widths(&[Length::inches(3.4), Length::inches(0.8), Length::inches(1.2), Length::inches(1.2)]);
+    t.header_row_style(accent, "FFFFFF");
+    cell_text(&mut t, 0, 0, "Description", Alignment::Left, true);
+    cell_text(&mut t, 0, 1, "Qty", Alignment::Center, true);
+    cell_text(&mut t, 0, 2, "Unit Price", Alignment::Right, true);
+    cell_text(&mut t, 0, 3, "Amount", Alignment::Right, true);
+    for r in 1..5 {
+        cell_text(&mut t, r, 0, "[Item or service description]", Alignment::Left, false);
+        cell_text(&mut t, r, 1, "1", Alignment::Center, false);
+        cell_text(&mut t, r, 2, "$0.00", Alignment::Right, false);
+        cell_text(&mut t, r, 3, "$0.00", Alignment::Right, false);
+    }
+    // Emphasized total row (shaded + bold), label right-aligned.
+    for col in 0..4 {
+        if let Some(c) = t.cell(5, col) { c.shading("EFEFEF"); }
+    }
+    cell_text(&mut t, 5, 2, "TOTAL", Alignment::Right, true);
+    cell_text(&mut t, 5, 3, "$0.00", Alignment::Right, true);
+
+    doc.add_paragraph("");
+    {
+        let mut p = doc.add_paragraph("");
+        p.add_run("Payment terms: ").bold(true);
+        p.add_run("Net 30. Make checks payable to [Your Company]. Thank you for your business.");
+    }
 }
 
-/// Newsletter: masthead title + two-column body for articles.
+/// Newsletter: ruled masthead + two-column body with ruled article headings.
 pub fn create_newsletter(doc: &mut Document) {
-    business_base(doc, "Newsletter", "8E44AD", "Calibri", "Georgia");
+    let accent = "6C3483";
+    business_base(doc, "Newsletter", accent, "Calibri", "Georgia");
     doc.add_paragraph("THE NEWSLETTER").style("Heading1").alignment(Alignment::Center);
-    doc.add_paragraph("[Organization] · [Volume / Issue] · [Date]").alignment(Alignment::Center);
+    {
+        use zavora_docx::BorderStyle;
+        doc.add_paragraph("")
+            .alignment(Alignment::Center)
+            .border_bottom(BorderStyle::Single, 8, accent)
+            .add_run("[Organization]  ·  [Volume / Issue]  ·  [Date]");
+    }
     doc.add_paragraph("");
     doc.set_columns(2, Length::inches(0.3));
-    heading(doc, 2, "Lead Story");
+    section_rule(doc, "Lead Story", accent);
     doc.add_paragraph("[Open with the most important news for your readers.]");
-    heading(doc, 2, "In This Issue");
+    section_rule(doc, "In This Issue", accent);
     doc.add_paragraph("[Secondary article or announcements.]");
-    heading(doc, 2, "Upcoming Events");
+    section_rule(doc, "Upcoming Events", accent);
     doc.add_paragraph("[Dates and details.]");
 }
 
