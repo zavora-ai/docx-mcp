@@ -113,6 +113,16 @@ pub struct SceneBreakInput {
 }
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct ChapterOpeningInput {
+    pub document_handle: String,
+    pub index: usize,
+    /// Full text of the chapter's first paragraph.
+    pub text: String,
+    /// Font family for the drop cap + lead-in. Default "Garamond".
+    pub font: Option<String>,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
 pub struct HeaderFooterInput {
     pub document_handle: String,
     pub header: Option<String>,
@@ -603,6 +613,14 @@ impl DocxServer {
         with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
             engine::insert_scene_break(doc, input.index, input.style.as_deref().unwrap_or("asterisks"));
             serde_json::json!({"inserted": true}).to_string()
+        })
+    }
+
+    #[tool(description = "Insert a best-seller chapter opening: a drop-cap initial letter with the first few words in small caps, then the body text. Use for the FIRST paragraph of each chapter (after the Heading1 chapter title). Pass the whole first paragraph as text.")]
+    async fn insert_chapter_opening(&self, Parameters(input): Parameters<ChapterOpeningInput>) -> String {
+        with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
+            engine::insert_chapter_opening(doc, input.index, &input.text, input.font.as_deref().unwrap_or("Garamond"));
+            serde_json::json!({"inserted": true, "paragraphs": 2}).to_string()
         })
     }
 

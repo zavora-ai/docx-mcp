@@ -108,7 +108,7 @@ pub fn create_novel(doc: &mut Document, cfg: &NovelConfig) {
     doc.set_first_page_footer("");
     doc.set_title(&cfg.title);
     if cfg.running_header {
-        doc.set_header(&format!("{}        {}", cfg.author, cfg.title));
+        doc.set_running_header(&cfg.author, &cfg.title);
     }
     doc.set_theme(
         &[("dk1","1A1A1A"),("lt1","FFFFF8"),("dk2","333333"),("lt2","F8F4E8"),
@@ -392,5 +392,42 @@ pub fn insert_scene_break(doc: &mut Document, index: usize, style: &str) {
         .space_after(Length::pt(18.0));
     if !symbol.is_empty() {
         para.add_run(symbol).font("Garamond").size(11.0);
+    }
+}
+
+/// Insert a best-seller chapter opening at `index`: a drop-cap initial letter
+/// (its own frame paragraph), the next few words in small caps, then the rest
+/// of the paragraph in the body style. The body paragraph wraps around the
+/// drop cap and is NOT first-line indented, per fiction convention.
+pub fn insert_chapter_opening(doc: &mut Document, index: usize, text: &str, font: &str) {
+    let mut chars = text.chars();
+    let first: String = chars.by_ref().take(1).collect();
+    let rest: String = chars.collect();
+
+    // Paragraph 1: the drop-cap letter alone, in a frame spanning 3 lines.
+    // Size it ~3x body so it visually fills the frame height.
+    let mut cap = doc.insert_paragraph(index, "");
+    cap = cap.drop_cap(3);
+    cap.add_run(&first).font(font).bold(true).size(44.0);
+
+    // Lead-in: first ~3 words after the initial letter rendered in small caps.
+    let mut lead_words = 0;
+    let mut split = rest.len();
+    for (i, c) in rest.char_indices() {
+        if c == ' ' {
+            lead_words += 1;
+            if lead_words == 3 { split = i; break; }
+        }
+    }
+    let (lead, tail) = rest.split_at(split);
+
+    // Paragraph 2: small-caps lead + body tail; wraps around the drop cap.
+    let mut body = doc.insert_paragraph(index + 1, "");
+    body = body.first_line_indent(Length::pt(0.0));
+    if !lead.is_empty() {
+        body.add_run(lead).font(font).small_caps(true);
+    }
+    if !tail.is_empty() {
+        body.add_run(&tail).font(font);
     }
 }
