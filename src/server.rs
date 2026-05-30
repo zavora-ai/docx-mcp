@@ -130,6 +130,24 @@ pub struct TocInput {
 }
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct ChartSeriesInput {
+    pub name: String,
+    pub values: Vec<f64>,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct ChartInput {
+    pub document_handle: String,
+    /// Chart type: "bar", "column", "line", "pie", "area".
+    pub kind: String,
+    pub categories: Vec<String>,
+    pub series: Vec<ChartSeriesInput>,
+    pub title: Option<String>,
+    pub width_inches: Option<f64>,
+    pub height_inches: Option<f64>,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
 pub struct TextBoxInput {
     pub document_handle: String,
     /// Lines of text inside the box.
@@ -798,6 +816,32 @@ impl DocxServer {
             let w = zavora_docx::Length::inches(input.width_inches.unwrap_or(2.0));
             let h = zavora_docx::Length::inches(input.height_inches.unwrap_or(2.0));
             doc.add_shape(w, h, &input.geometry, input.fill_color.as_deref());
+            serde_json::json!({"added": true}).to_string()
+        })
+    }
+
+    #[tool(description = "Add a native, editable chart (bar, column, line, pie, or area). Provide categories (x-axis labels) and one or more series, each with a name and a value per category. Renders as a real Word chart with its own data. Width/height default to 5x3 inches.")]
+    async fn add_chart(&self, Parameters(input): Parameters<ChartInput>) -> String {
+        with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
+            let kind = match input.kind.as_str() {
+                "bar" => zavora_docx::ChartKind::Bar,
+                "column" => zavora_docx::ChartKind::Column,
+                "line" => zavora_docx::ChartKind::Line,
+                "pie" => zavora_docx::ChartKind::Pie,
+                "area" => zavora_docx::ChartKind::Area,
+                other => return serde_json::json!({"error": format!("unknown chart kind: {other}")}).to_string(),
+            };
+            let chart = zavora_docx::Chart {
+                kind,
+                title: input.title.clone(),
+                categories: input.categories.clone(),
+                series: input.series.iter()
+                    .map(|s| zavora_docx::Series { name: s.name.clone(), values: s.values.clone() })
+                    .collect(),
+            };
+            let w = zavora_docx::Length::inches(input.width_inches.unwrap_or(5.0));
+            let h = zavora_docx::Length::inches(input.height_inches.unwrap_or(3.0));
+            doc.add_chart(&chart, w, h);
             serde_json::json!({"added": true}).to_string()
         })
     }
