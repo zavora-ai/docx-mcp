@@ -130,6 +130,23 @@ pub struct TocInput {
 }
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct ContentControlInput {
+    pub document_handle: String,
+    /// Control kind: "text", "rich_text", "dropdown", "combo", "date", "checkbox".
+    pub kind: String,
+    /// Tag identifying the control.
+    pub tag: String,
+    /// Display/placeholder text shown inside the control.
+    pub placeholder: Option<String>,
+    /// Options as [display, value] pairs (for dropdown/combo).
+    pub options: Option<Vec<[String; 2]>>,
+    /// Date display format (for date), e.g. "yyyy-MM-dd".
+    pub date_format: Option<String>,
+    /// Initial checked state (for checkbox).
+    pub checked: Option<bool>,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
 pub struct DocumentSettingsInput {
     pub document_handle: String,
     /// Default automatic tab stop width, in inches.
@@ -707,6 +724,26 @@ impl DocxServer {
                 doc.set_auto_hyphenation(v);
             }
             serde_json::json!({"updated": true}).to_string()
+        })
+    }
+
+    #[tool(description = "Add a content control (structured document tag) to the end of the document: text, rich_text, dropdown, combo, date, or checkbox. Provide a tag to identify it; placeholder is the display text. dropdown/combo take options as [display,value] pairs; date takes date_format (e.g. yyyy-MM-dd); checkbox takes checked.")]
+    async fn add_content_control(&self, Parameters(input): Parameters<ContentControlInput>) -> String {
+        with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
+            let opts = || input.options.clone().unwrap_or_default()
+                .into_iter().map(|o| (o[0].clone(), o[1].clone())).collect::<Vec<_>>();
+            let kind = match input.kind.as_str() {
+                "text" => zavora_docx::SdtKind::Text,
+                "rich_text" => zavora_docx::SdtKind::RichText,
+                "dropdown" => zavora_docx::SdtKind::DropDown(opts()),
+                "combo" => zavora_docx::SdtKind::ComboBox(opts()),
+                "date" => zavora_docx::SdtKind::Date(
+                    input.date_format.clone().unwrap_or_else(|| "yyyy-MM-dd".to_string())),
+                "checkbox" => zavora_docx::SdtKind::Checkbox(input.checked.unwrap_or(false)),
+                other => return serde_json::json!({"error": format!("unknown kind: {other}")}).to_string(),
+            };
+            doc.add_content_control(kind, &input.tag, input.placeholder.as_deref());
+            serde_json::json!({"added": true}).to_string()
         })
     }
 
