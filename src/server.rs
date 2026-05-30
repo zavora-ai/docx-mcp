@@ -135,6 +135,36 @@ pub struct ChartSeriesInput {
     pub values: Vec<f64>,
 }
 
+/// Build a DataLabels config from chart input, starting from the per-kind
+/// default and applying any caller overrides. Returns None only if the caller
+/// supplied nothing (so the library default applies).
+fn build_labels(input: &ChartInput, kind: zavora_docx::ChartKind) -> Option<zavora_docx::DataLabels> {
+    let any = input.label_position.is_some()
+        || input.label_show_value.is_some()
+        || input.label_show_category.is_some()
+        || input.label_show_percent.is_some()
+        || input.label_color.is_some();
+    if !any {
+        return None;
+    }
+    let mut l = zavora_docx::Chart::default_labels(kind);
+    if let Some(ref p) = input.label_position {
+        l.position = match p.as_str() {
+            "outEnd" => Some(zavora_docx::LabelPosition::OutsideEnd),
+            "inEnd" => Some(zavora_docx::LabelPosition::InsideEnd),
+            "ctr" => Some(zavora_docx::LabelPosition::Center),
+            "inBase" => Some(zavora_docx::LabelPosition::InsideBase),
+            "bestFit" => Some(zavora_docx::LabelPosition::BestFit),
+            _ => l.position,
+        };
+    }
+    if let Some(v) = input.label_show_value { l.show_value = v; }
+    if let Some(v) = input.label_show_category { l.show_category = v; }
+    if let Some(v) = input.label_show_percent { l.show_percent = v; }
+    if input.label_color.is_some() { l.color = input.label_color.clone(); }
+    Some(l)
+}
+
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
 pub struct ChartInput {
     pub document_handle: String,
@@ -145,6 +175,16 @@ pub struct ChartInput {
     pub title: Option<String>,
     pub width_inches: Option<f64>,
     pub height_inches: Option<f64>,
+    /// Data-label position: "outEnd", "inEnd", "ctr", "inBase", "bestFit".
+    pub label_position: Option<String>,
+    /// Show value on labels.
+    pub label_show_value: Option<bool>,
+    /// Show category name on labels.
+    pub label_show_category: Option<bool>,
+    /// Show percentage on labels (pie).
+    pub label_show_percent: Option<bool>,
+    /// Fixed label text color (hex, e.g. "FFFFFF"). Omit for theme default.
+    pub label_color: Option<String>,
 }
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
@@ -820,7 +860,7 @@ impl DocxServer {
         })
     }
 
-    #[tool(description = "Add a native, editable chart (bar, column, line, pie, or area). Provide categories (x-axis labels) and one or more series, each with a name and a value per category. Renders as a real Word chart with its own data. Width/height default to 5x3 inches.")]
+    #[tool(description = "Add a native, editable chart (bar, column, line, pie, or area). Provide categories (x-axis labels) and one or more series, each with a name and a value per category. Data labels are configurable: label_position (outEnd/inEnd/ctr/inBase/bestFit), label_show_value/category/percent, and label_color (hex). Defaults place labels outside for readable contrast. Width/height default to 5x3 inches.")]
     async fn add_chart(&self, Parameters(input): Parameters<ChartInput>) -> String {
         with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
             let kind = match input.kind.as_str() {
@@ -838,6 +878,7 @@ impl DocxServer {
                 series: input.series.iter()
                     .map(|s| zavora_docx::Series { name: s.name.clone(), values: s.values.clone() })
                     .collect(),
+                labels: build_labels(&input, kind),
             };
             let w = zavora_docx::Length::inches(input.width_inches.unwrap_or(5.0));
             let h = zavora_docx::Length::inches(input.height_inches.unwrap_or(3.0));
