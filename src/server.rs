@@ -976,12 +976,7 @@ impl DocxServer {
     #[tool(description = "Export document as plain text")]
     pub async fn to_plain_text(&self, Parameters(input): Parameters<ExportInput>) -> String {
         with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
-            let mut text = String::new();
-            for para in doc.paragraphs() {
-                text.push_str(&para.text());
-                text.push('\n');
-            }
-            serde_json::json!({"text": text}).to_string()
+            serde_json::json!({"text": doc.to_plain_text()}).to_string()
         })
     }
 

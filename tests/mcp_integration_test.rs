@@ -188,4 +188,6 @@ async fn business_template_fills_supplied_data() {
         .await;
     let text = json(&r)["text"].as_str().expect("text").to_string();
     assert!(text.contains("Northwind Studio"), "supplied company missing: {text}");
+    // 1×4500 + 12×350 = 8700 → in-table TOTAL is now reachable via plain text.
+    assert!(text.contains("$8,700.00"), "computed total missing: {text}");
 }
