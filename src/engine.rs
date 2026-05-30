@@ -307,6 +307,181 @@ pub fn create_kdp_manga(doc: &mut Document) {
     doc.set_title("Untitled Manga");
 }
 
+// ── Business / professional templates ────────────────────────────────────────
+
+/// US Letter page + a clean corporate theme. `accent` is the heading/brand hex.
+fn business_base(doc: &mut Document, title: &str, accent: &str, heading_font: &str, body_font: &str) {
+    doc.set_page_size(Length::inches(8.5), Length::inches(11.0));
+    doc.set_margins(Length::inches(1.0), Length::inches(1.0), Length::inches(1.0), Length::inches(1.0));
+    doc.set_title(title);
+    doc.set_theme(
+        &[("dk1","1A1A1A"),("lt1","FFFFFF"),("dk2","404040"),("lt2","F2F2F2"),
+          ("accent1",accent),("accent2","C0392B"),("accent3","27AE60"),
+          ("accent4","F39C12"),("accent5","8E44AD"),("accent6","16A085"),
+          ("hlink",accent),("folHlink","8E44AD")],
+        heading_font, body_font,
+    );
+    apply_book_styles(doc, &BookStyle {
+        body_font, heading_font,
+        body_pt: 11.0, line_spacing: 1.15, justified: false, heading_color: accent,
+    });
+}
+
+/// Heading-style helper: a paragraph in Heading{level} style.
+fn heading(doc: &mut Document, level: u32, text: &str) {
+    doc.add_paragraph(text).style(&format!("Heading{level}"));
+}
+
+/// Business report: title page-style header, sections scaffold, page numbers.
+pub fn create_business_report(doc: &mut Document) {
+    business_base(doc, "Business Report", "2980B9", "Calibri", "Cambria");
+    doc.set_footer_page_number();
+    doc.add_paragraph("BUSINESS REPORT").style("Heading1").alignment(Alignment::Center);
+    doc.add_paragraph("Subtitle / Reporting Period").alignment(Alignment::Center);
+    doc.add_paragraph("Prepared by: [Author] · [Date]").alignment(Alignment::Center);
+    doc.add_paragraph("");
+    heading(doc, 2, "Executive Summary");
+    doc.add_paragraph("[Summarize the report's key findings and recommendations.]");
+    heading(doc, 2, "Introduction");
+    doc.add_paragraph("[Background and objectives.]");
+    heading(doc, 2, "Findings");
+    doc.add_paragraph("[Present your analysis and data.]");
+    heading(doc, 2, "Recommendations");
+    doc.add_paragraph("[Actionable next steps.]");
+    heading(doc, 2, "Conclusion");
+    doc.add_paragraph("[Closing remarks.]");
+}
+
+/// Resume / CV: name header, contact line, and standard sections.
+pub fn create_resume(doc: &mut Document) {
+    business_base(doc, "Resume", "2C3E50", "Calibri", "Calibri");
+    doc.set_margins(Length::inches(0.75), Length::inches(0.75), Length::inches(0.75), Length::inches(0.75));
+    doc.add_paragraph("YOUR NAME").style("Heading1").alignment(Alignment::Center);
+    doc.add_paragraph("City, State · email@example.com · (555) 555-5555 · linkedin.com/in/you")
+        .alignment(Alignment::Center);
+    doc.add_paragraph("");
+    heading(doc, 2, "Professional Summary");
+    doc.add_paragraph("[2-3 sentence summary of your experience and strengths.]");
+    heading(doc, 2, "Experience");
+    {
+        let mut p = doc.add_paragraph("");
+        p.add_run("Job Title — Company").bold(true);
+        p.add_run("    [Dates]").italic(true);
+    }
+    doc.add_paragraph("• [Accomplishment with a measurable result.]");
+    doc.add_paragraph("• [Accomplishment with a measurable result.]");
+    heading(doc, 2, "Education");
+    doc.add_paragraph("Degree, Institution — [Year]");
+    heading(doc, 2, "Skills");
+    doc.add_paragraph("[Skill] · [Skill] · [Skill] · [Skill]");
+}
+
+/// Business letter: block format with sender/recipient/date/salutation/body/closing.
+pub fn create_letter(doc: &mut Document) {
+    business_base(doc, "Letter", "1A1A1A", "Cambria", "Cambria");
+    doc.add_paragraph("[Your Name]");
+    doc.add_paragraph("[Street Address]");
+    doc.add_paragraph("[City, State ZIP]");
+    doc.add_paragraph("");
+    doc.add_paragraph("[Date]");
+    doc.add_paragraph("");
+    doc.add_paragraph("[Recipient Name]");
+    doc.add_paragraph("[Title, Company]");
+    doc.add_paragraph("[Address]");
+    doc.add_paragraph("");
+    doc.add_paragraph("Dear [Recipient],");
+    doc.add_paragraph("");
+    doc.add_paragraph("[Opening paragraph — state your purpose.]");
+    doc.add_paragraph("[Body paragraph — provide detail and context.]");
+    doc.add_paragraph("[Closing paragraph — call to action / next steps.]");
+    doc.add_paragraph("");
+    doc.add_paragraph("Sincerely,");
+    doc.add_paragraph("");
+    doc.add_paragraph("[Your Name]");
+}
+
+/// Memo: standard TO/FROM/DATE/RE header block plus body.
+pub fn create_memo(doc: &mut Document) {
+    business_base(doc, "Memo", "404040", "Calibri", "Calibri");
+    doc.add_paragraph("MEMORANDUM").style("Heading1");
+    let mut t = doc.add_table(4, 2);
+    for (i, label) in ["TO:", "FROM:", "DATE:", "RE:"].iter().enumerate() {
+        if let Some(mut c) = t.cell(i, 0) { c.set_text(label); }
+        if let Some(mut c) = t.cell(i, 1) { c.set_text("[ ... ]"); }
+    }
+    doc.add_paragraph("");
+    doc.add_paragraph("[Purpose of the memo in one line.]");
+    doc.add_paragraph("[Body — context, details, and any action required.]");
+    doc.add_paragraph("[Closing — deadlines or contact for questions.]");
+}
+
+/// Invoice: header, bill-to, a line-items table, and a totals row.
+pub fn create_invoice(doc: &mut Document) {
+    business_base(doc, "Invoice", "27AE60", "Calibri", "Calibri");
+    doc.add_paragraph("INVOICE").style("Heading1");
+    doc.add_paragraph("[Your Company] · [Address] · [email] · [phone]");
+    doc.add_paragraph("Invoice #: [0001]    Date: [Date]    Due: [Date]");
+    doc.add_paragraph("");
+    doc.add_paragraph("Bill To: [Client Name, Address]");
+    doc.add_paragraph("");
+    let mut t = doc.add_table(5, 4);
+    t.header_row_style("27AE60", "FFFFFF");
+    for (c, h) in ["Description", "Qty", "Unit Price", "Amount"].iter().enumerate() {
+        if let Some(mut cell) = t.cell(0, c) { cell.set_text(h); }
+    }
+    for r in 1..4 {
+        if let Some(mut cell) = t.cell(r, 0) { cell.set_text("[Item / service]"); }
+        if let Some(mut cell) = t.cell(r, 1) { cell.set_text("[1]"); }
+        if let Some(mut cell) = t.cell(r, 2) { cell.set_text("[$0.00]"); }
+        if let Some(mut cell) = t.cell(r, 3) { cell.set_text("[$0.00]"); }
+    }
+    if let Some(mut cell) = t.cell(4, 2) { cell.set_text("TOTAL"); }
+    if let Some(mut cell) = t.cell(4, 3) { cell.set_text("[$0.00]"); }
+    doc.add_paragraph("");
+    doc.add_paragraph("Payment terms: [Net 30]. Make checks payable to [Your Company].");
+}
+
+/// Newsletter: masthead title + two-column body for articles.
+pub fn create_newsletter(doc: &mut Document) {
+    business_base(doc, "Newsletter", "8E44AD", "Calibri", "Georgia");
+    doc.add_paragraph("THE NEWSLETTER").style("Heading1").alignment(Alignment::Center);
+    doc.add_paragraph("[Organization] · [Volume / Issue] · [Date]").alignment(Alignment::Center);
+    doc.add_paragraph("");
+    doc.set_columns(2, Length::inches(0.3));
+    heading(doc, 2, "Lead Story");
+    doc.add_paragraph("[Open with the most important news for your readers.]");
+    heading(doc, 2, "In This Issue");
+    doc.add_paragraph("[Secondary article or announcements.]");
+    heading(doc, 2, "Upcoming Events");
+    doc.add_paragraph("[Dates and details.]");
+}
+
+/// Academic paper: title block, abstract, numbered sections, references.
+pub fn create_academic(doc: &mut Document) {
+    business_base(doc, "Academic Paper", "1A1A1A", "Times New Roman", "Times New Roman");
+    apply_book_styles(doc, &BookStyle {
+        body_font: "Times New Roman", heading_font: "Times New Roman",
+        body_pt: 12.0, line_spacing: 2.0, justified: false, heading_color: "1A1A1A",
+    });
+    doc.set_footer_page_number();
+    doc.add_paragraph("Paper Title").style("Heading1").alignment(Alignment::Center);
+    doc.add_paragraph("Author Name").alignment(Alignment::Center);
+    doc.add_paragraph("Institution / Affiliation").alignment(Alignment::Center);
+    doc.add_paragraph("");
+    heading(doc, 2, "Abstract");
+    doc.add_paragraph("[150-250 word summary of the research.]");
+    heading(doc, 2, "1. Introduction");
+    doc.add_paragraph("[Problem statement, motivation, and contributions.]");
+    heading(doc, 2, "2. Methods");
+    doc.add_paragraph("[Describe your approach and materials.]");
+    heading(doc, 2, "3. Results");
+    doc.add_paragraph("[Present findings, with figures/tables.]");
+    heading(doc, 2, "4. Discussion");
+    doc.add_paragraph("[Interpret results and limitations.]");
+    heading(doc, 2, "References");
+    doc.add_paragraph("[1] Author, A. (Year). Title. Journal.");
+}
+
 // ── Paragraph helpers ────────────────────────────────────────────────────────
 
 /// Syntax highlighting colors for common tokens.

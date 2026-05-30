@@ -12,7 +12,7 @@ environments = ["development", "staging", "production"]
 
 [[tools]]
 name = "create_document"
-description = "Create a new DOCX document. format: 'kdp:technical' (6x9), 'kdp:novel' (5.25x8), 'kdp:cookbook' (8x10), 'kdp:children' (8.5x8.5 square), ..."
+description = "Create a new DOCX document. KDP book formats: 'kdp:technical' (6x9), 'kdp:novel' (5.25x8), 'kdp:cookbook' (8x10), 'kdp:children' (8.5x8.5..."
 risk_class = "local_write"
 requires_approval = false
 credential_bindings = []
