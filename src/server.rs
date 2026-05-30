@@ -99,6 +99,15 @@ pub struct ImageInput {
 }
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct PageBackgroundInput {
+    pub document_handle: String,
+    /// Body index where the background anchors (place after a page break so it
+    /// covers that page). Use document content_count for the current end.
+    pub index: usize,
+    pub image_path: String,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
 pub struct TocInput {
     pub document_handle: String,
     pub index: usize,
@@ -597,6 +606,19 @@ impl DocxServer {
             let h = zavora_docx::Length::inches(input.height.unwrap_or(3.0));
             doc.add_picture(&img_data, &filename, w, h);
             serde_json::json!({"added": true}).to_string()
+        })
+    }
+
+    #[tool(description = "Add a full-bleed page background image anchored to the page at `index` (place a page-break paragraph there first so it covers that page). Text added after flows on top. Use for children's book spreads and full-page interior plates. Returns the anchor index.")]
+    async fn add_page_background(&self, Parameters(input): Parameters<PageBackgroundInput>) -> String {
+        with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
+            let img_data = match std::fs::read(&input.image_path) {
+                Ok(d) => d,
+                Err(e) => return serde_json::json!({"error": e.to_string()}).to_string(),
+            };
+            let ext = input.image_path.rsplit('.').next().unwrap_or("png");
+            let at = doc.add_page_background_at(input.index, &img_data, &format!("bg.{ext}"));
+            serde_json::json!({"anchored_at": at}).to_string()
         })
     }
 
