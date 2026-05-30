@@ -17,7 +17,7 @@ async fn tools_build_a_feature_rich_document() {
 
     // create
     let r = srv
-        .create_document(Parameters(CreateInput { title: Some("MCP".into()), format: None }))
+        .create_document(Parameters(CreateInput { title: Some("MCP".into()), format: None, data: None }))
         .await;
     let handle = json(&r)["handle"].as_str().expect("handle").to_string();
 
@@ -141,7 +141,7 @@ async fn tools_build_a_feature_rich_document() {
 #[tokio::test]
 async fn unknown_chart_kind_is_rejected() {
     let srv = DocxServer::new();
-    let h = json(&srv.create_document(Parameters(CreateInput { title: None, format: None })).await)
+    let h = json(&srv.create_document(Parameters(CreateInput { title: None, format: None, data: None })).await)
         ["handle"]
         .as_str()
         .unwrap()
@@ -163,4 +163,29 @@ async fn unknown_chart_kind_is_rejected() {
         }))
         .await;
     assert!(json(&r)["error"].is_string(), "expected error for bogus kind: {r}");
+}
+
+#[tokio::test]
+async fn business_template_fills_supplied_data() {
+    let srv = DocxServer::new();
+    let data = serde_json::json!({
+        "company": "Northwind Studio",
+        "items": [
+            {"description": "Design", "qty": 1, "price": 4500},
+            {"description": "Dev", "qty": 12, "price": 350}
+        ]
+    });
+    let r = srv
+        .create_document(Parameters(CreateInput {
+            title: None,
+            format: Some("business:invoice".into()),
+            data: Some(data),
+        }))
+        .await;
+    let handle = json(&r)["handle"].as_str().expect("handle").to_string();
+    let r = srv
+        .to_plain_text(Parameters(ExportInput { document_handle: handle }))
+        .await;
+    let text = json(&r)["text"].as_str().expect("text").to_string();
+    assert!(text.contains("Northwind Studio"), "supplied company missing: {text}");
 }

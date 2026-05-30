@@ -11,6 +11,12 @@ pub struct CreateInput {
     pub title: Option<String>,
     /// "kdp:technical", "kdp:novel", "kdp:cookbook", "kdp:children", "kdp:interior_design", "kdp:encyclopedia", "kdp:manga", or omit for blank
     pub format: Option<String>,
+    /// Optional data to fill a business template instead of placeholders. Keys vary by
+    /// format — e.g. invoice: company, company_details, number, date, due, bill_to, terms,
+    /// items:[{description,qty,price,amount?}] (total auto-computed); resume: name, contact,
+    /// summary, skills, experience:[{title,dates,location,bullets:[..]}], education:[{degree,year}];
+    /// report/letter/memo/newsletter/academic: their visible fields by name. Missing keys keep the placeholder.
+    pub data: Option<serde_json::Value>,
 }
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
@@ -591,6 +597,8 @@ impl DocxServer {
     #[tool(description = "Create a new DOCX document. KDP book formats: 'kdp:technical' (6x9), 'kdp:novel' (5.25x8), 'kdp:cookbook' (8x10), 'kdp:children' (8.5x8.5), 'kdp:interior_design' (8.5x11), 'kdp:encyclopedia' (8.5x11 2-col), 'kdp:manga' (5x7.5). Business/professional formats (US Letter, themed, with seeded scaffold): 'business:report', 'business:resume', 'business:letter', 'business:memo', 'business:invoice', 'business:newsletter', 'business:academic'. Omit format for a blank document.")]
     pub async fn create_document(&self, Parameters(input): Parameters<CreateInput>) -> String {
         let mut doc = zavora_docx::Document::new();
+        let data = input.data.clone().unwrap_or(serde_json::Value::Null);
+        let f = engine::Fields::new(&data);
         match input.format.as_deref() {
             Some("kdp:technical" | "kdp") => engine::create_kdp_technical(&mut doc),
             Some("kdp:novel") => engine::create_kdp_novel(&mut doc),
@@ -599,13 +607,13 @@ impl DocxServer {
             Some("kdp:interior_design") => engine::create_kdp_interior_design(&mut doc),
             Some("kdp:encyclopedia") => engine::create_kdp_encyclopedia(&mut doc),
             Some("kdp:manga") => engine::create_kdp_manga(&mut doc),
-            Some("business:report") => engine::create_business_report(&mut doc),
-            Some("business:resume") => engine::create_resume(&mut doc),
-            Some("business:letter") => engine::create_letter(&mut doc),
-            Some("business:memo") => engine::create_memo(&mut doc),
-            Some("business:invoice") => engine::create_invoice(&mut doc),
-            Some("business:newsletter") => engine::create_newsletter(&mut doc),
-            Some("business:academic") => engine::create_academic(&mut doc),
+            Some("business:report") => engine::create_business_report(&mut doc, &f),
+            Some("business:resume") => engine::create_resume(&mut doc, &f),
+            Some("business:letter") => engine::create_letter(&mut doc, &f),
+            Some("business:memo") => engine::create_memo(&mut doc, &f),
+            Some("business:invoice") => engine::create_invoice(&mut doc, &f),
+            Some("business:newsletter") => engine::create_newsletter(&mut doc, &f),
+            Some("business:academic") => engine::create_academic(&mut doc, &f),
             _ => {}
         }
         let mut store = self.store.lock().await;
