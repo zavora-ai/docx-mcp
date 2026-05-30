@@ -191,3 +191,29 @@ async fn business_template_fills_supplied_data() {
     // 1×4500 + 12×350 = 8700 → in-table TOTAL is now reachable via plain text.
     assert!(text.contains("$8,700.00"), "computed total missing: {text}");
 }
+
+#[tokio::test]
+async fn proposal_template_computes_total() {
+    let srv = DocxServer::new();
+    let data = serde_json::json!({
+        "title": "Redesign",
+        "items": [
+            {"description": "A", "qty": 1, "price": 6000},
+            {"description": "B", "qty": 8, "price": 900}
+        ]
+    });
+    let r = srv
+        .create_document(Parameters(CreateInput {
+            title: None,
+            format: Some("business:proposal".into()),
+            data: Some(data),
+        }))
+        .await;
+    let handle = json(&r)["handle"].as_str().expect("handle").to_string();
+    let r = srv
+        .to_plain_text(Parameters(ExportInput { document_handle: handle }))
+        .await;
+    let text = json(&r)["text"].as_str().expect("text").to_string();
+    // 6000 + 8×900 = 13200 → auto-summed deliverables total.
+    assert!(text.contains("$13,200.00"), "proposal total missing: {text}");
+}

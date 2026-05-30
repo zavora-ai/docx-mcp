@@ -649,6 +649,160 @@ pub fn create_academic(doc: &mut Document, f: &Fields) {
     doc.add_paragraph(&f.get("references", "[1] Author, A. (Year). Title. Journal."));
 }
 
+/// Project proposal: cover block, ruled sections, and a priced deliverables
+/// table with an auto-summed total.
+pub fn create_proposal(doc: &mut Document, f: &Fields) {
+    use zavora_docx::BorderStyle;
+    let accent = "B9770E";
+    business_base(doc, "Proposal", accent, "Calibri", "Cambria");
+    doc.set_footer_page_number();
+    doc.add_paragraph(&f.get("title", "PROJECT PROPOSAL").to_uppercase()).style("Heading1").alignment(Alignment::Center);
+    doc.add_paragraph(&format!("Prepared for {} · by {}", f.get("client", "[Client]"), f.get("author", "[Your Company]"))).alignment(Alignment::Center);
+    doc.add_paragraph(&f.get("date", "[Date]")).alignment(Alignment::Center);
+    section_rule(doc, "Overview", accent);
+    doc.add_paragraph(&f.get("overview", "[Summarize the problem and your proposed solution.]"));
+    section_rule(doc, "Scope of Work", accent);
+    doc.add_paragraph(&f.get("scope", "[Describe deliverables, approach, and boundaries.]"));
+    section_rule(doc, "Timeline", accent);
+    doc.add_paragraph(&f.get("timeline", "[Phases, milestones, and dates.]"));
+    section_rule(doc, "Investment", accent);
+    let items = f.arr("items");
+    let n = items.len().max(3);
+    let mut t = doc.add_table(n + 2, 3)
+        .borders(BorderStyle::Single, 4, "D0D0D0")
+        .column_widths(&[Length::inches(4.2), Length::inches(1.0), Length::inches(1.3)]);
+    t.header_row_style(accent, "FFFFFF");
+    cell_text(&mut t, 0, 0, "Deliverable", Alignment::Left, true);
+    cell_text(&mut t, 0, 1, "Qty", Alignment::Center, true);
+    cell_text(&mut t, 0, 2, "Amount", Alignment::Right, true);
+    let mut total = 0.0;
+    for r in 1..=n {
+        match items.get(r - 1) {
+            Some(it) => {
+                let qty = it.get("qty").and_then(|v| v.as_f64()).unwrap_or(1.0);
+                let price = it.get("price").and_then(|v| v.as_f64()).unwrap_or(0.0);
+                let amount = it.get("amount").and_then(|v| v.as_f64()).unwrap_or(qty * price);
+                total += amount;
+                cell_text(&mut t, r, 0, jstr(it, "description", "[Deliverable]"), Alignment::Left, false);
+                cell_text(&mut t, r, 1, &fmt_qty(qty), Alignment::Center, false);
+                cell_text(&mut t, r, 2, &money(amount), Alignment::Right, false);
+            }
+            None => {
+                cell_text(&mut t, r, 0, "[Deliverable]", Alignment::Left, false);
+                cell_text(&mut t, r, 1, "1", Alignment::Center, false);
+                cell_text(&mut t, r, 2, "$0.00", Alignment::Right, false);
+            }
+        }
+    }
+    let tr = n + 1;
+    for col in 0..3 {
+        if let Some(c) = t.cell(tr, col) { c.shading("EFEFEF"); }
+    }
+    cell_text(&mut t, tr, 1, "TOTAL", Alignment::Right, true);
+    cell_text(&mut t, tr, 2, &if items.is_empty() { "$0.00".into() } else { money(total) }, Alignment::Right, true);
+    section_rule(doc, "Acceptance", accent);
+    doc.add_paragraph(&f.get("acceptance", "[Signature, date, and terms of acceptance.]"));
+}
+
+/// Meeting agenda: meta block + ruled item list with right-aligned durations.
+pub fn create_agenda(doc: &mut Document, f: &Fields) {
+    let accent = "2C3E50";
+    business_base(doc, "Agenda", accent, "Calibri", "Calibri");
+    doc.set_margins(Length::inches(0.75), Length::inches(0.75), Length::inches(0.75), Length::inches(0.75));
+    let edge = 7.0;
+    doc.add_paragraph(&f.get("title", "MEETING AGENDA").to_uppercase()).style("Heading1").alignment(Alignment::Center);
+    let mut t = doc.add_table(3, 2)
+        .column_widths(&[Length::inches(1.2), Length::inches(5.3)]);
+    let meta = [("Date", f.get("date", "[Date]")), ("Time", f.get("time", "[Time]")), ("Location", f.get("location", "[Location]"))];
+    for (i, (k, v)) in meta.iter().enumerate() {
+        cell_text(&mut t, i, 0, k, Alignment::Left, true);
+        cell_text(&mut t, i, 1, v, Alignment::Left, false);
+    }
+    doc.add_paragraph(&format!("Attendees: {}", f.get("attendees", "[Names]")));
+    section_rule(doc, "Agenda", accent);
+    let items = f.arr("items");
+    if items.is_empty() {
+        for d in ["[Topic — owner]", "[Topic — owner]", "[Topic — owner]"] {
+            dated_entry(doc, d, false, "[min]", edge);
+        }
+    } else {
+        for it in items {
+            dated_entry(doc, jstr(it, "topic", "[Topic]"), true, jstr(it, "duration", ""), edge);
+            let owner = jstr(it, "owner", "");
+            if !owner.is_empty() { doc.add_paragraph("").add_run(owner).italic(true); }
+        }
+    }
+    section_rule(doc, "Notes", accent);
+    doc.add_paragraph(&f.get("notes", "[Action items and decisions.]"));
+}
+
+/// Press release: FOR IMMEDIATE RELEASE banner, headline, dateline, body,
+/// boilerplate, and an end marker.
+pub fn create_press_release(doc: &mut Document, f: &Fields) {
+    let accent = "1A1A1A";
+    business_base(doc, "Press Release", accent, "Arial", "Georgia");
+    {
+        let mut p = doc.add_paragraph("");
+        p.add_run(&f.get("status", "FOR IMMEDIATE RELEASE")).bold(true).all_caps(true).color(accent);
+    }
+    doc.add_paragraph("");
+    doc.add_paragraph(&f.get("headline", "Headline Goes Here")).style("Heading1").alignment(Alignment::Center);
+    {
+        let mut p = doc.add_paragraph("").alignment(Alignment::Center);
+        p.add_run(&f.get("subhead", "[Optional subheadline]")).italic(true);
+    }
+    doc.add_paragraph("");
+    {
+        let mut p = doc.add_paragraph("");
+        p.add_run(&format!("{} — ", f.get("dateline", "CITY, State, [Date]"))).bold(true);
+        p.add_run(&f.get("body", "[Lead paragraph — the who/what/when/where/why.]"));
+    }
+    doc.add_paragraph(&f.get("body2", "[Supporting detail, quote, and context.]"));
+    doc.add_paragraph("");
+    section_rule(doc, &format!("About {}", f.get("organization", "")), accent);
+    doc.add_paragraph(&f.get("boilerplate", "[One paragraph about your organization.]"));
+    {
+        let mut p = doc.add_paragraph("");
+        p.add_run("Media contact: ").bold(true);
+        p.add_run(&f.get("contact", "[Name · email · phone]"));
+    }
+    doc.add_paragraph("###").alignment(Alignment::Center);
+}
+
+/// Certificate: centered ornamental award with a large recipient name and a
+/// signature/date footer.
+pub fn create_certificate(doc: &mut Document, f: &Fields) {
+    use zavora_docx::BorderStyle;
+    let accent = "8A6D1F";
+    business_base(doc, "Certificate", accent, "Georgia", "Georgia");
+    doc.set_landscape();
+    for _ in 0..2 { doc.add_paragraph(""); }
+    doc.add_paragraph(&f.get("title", "Certificate of Achievement")).style("Heading1").alignment(Alignment::Center);
+    {
+        let mut p = doc.add_paragraph("").alignment(Alignment::Center);
+        p.add_run(&f.get("presented", "This certificate is proudly presented to")).italic(true).size(13.0);
+    }
+    doc.add_paragraph("");
+    {
+        let mut p = doc.add_paragraph("")
+            .alignment(Alignment::Center)
+            .border_bottom(BorderStyle::Single, 6, accent);
+        p.add_run(&f.get("recipient", "Recipient Name")).bold(true).size(30.0).color(accent);
+    }
+    doc.add_paragraph("");
+    {
+        let mut p = doc.add_paragraph("").alignment(Alignment::Center);
+        p.add_run(&f.get("reason", "in recognition of outstanding achievement.")).size(13.0);
+    }
+    for _ in 0..2 { doc.add_paragraph(""); }
+    let mut t = doc.add_table(2, 2)
+        .column_widths(&[Length::inches(4.0), Length::inches(4.0)]);
+    cell_text(&mut t, 0, 0, f.get("date", "[Date]").as_str(), Alignment::Center, false);
+    cell_text(&mut t, 0, 1, f.get("signature", "[Signature]").as_str(), Alignment::Center, false);
+    cell_text(&mut t, 1, 0, "Date", Alignment::Center, true);
+    cell_text(&mut t, 1, 1, "Authorized by", Alignment::Center, true);
+}
+
 // ── Paragraph helpers ────────────────────────────────────────────────────────
 
 /// Syntax highlighting colors for common tokens.

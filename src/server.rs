@@ -594,7 +594,7 @@ macro_rules! with_doc {
 
 #[tool_router(server_handler)]
 impl DocxServer {
-    #[tool(description = "Create a new DOCX document. KDP book formats: 'kdp:technical' (6x9), 'kdp:novel' (5.25x8), 'kdp:cookbook' (8x10), 'kdp:children' (8.5x8.5), 'kdp:interior_design' (8.5x11), 'kdp:encyclopedia' (8.5x11 2-col), 'kdp:manga' (5x7.5). Business/professional formats (US Letter, themed, with seeded scaffold): 'business:report', 'business:resume', 'business:letter', 'business:memo', 'business:invoice', 'business:newsletter', 'business:academic'. Omit format for a blank document.")]
+    #[tool(description = "Create a new DOCX document. KDP book formats: 'kdp:technical' (6x9), 'kdp:novel' (5.25x8), 'kdp:cookbook' (8x10), 'kdp:children' (8.5x8.5), 'kdp:interior_design' (8.5x11), 'kdp:encyclopedia' (8.5x11 2-col), 'kdp:manga' (5x7.5). Business/professional formats (US Letter, themed, with seeded scaffold): 'business:report', 'business:resume', 'business:letter', 'business:memo', 'business:invoice', 'business:newsletter', 'business:academic', 'business:proposal', 'business:agenda', 'business:press_release', 'business:certificate'. Omit format for a blank document.")]
     pub async fn create_document(&self, Parameters(input): Parameters<CreateInput>) -> String {
         let mut doc = zavora_docx::Document::new();
         let data = input.data.clone().unwrap_or(serde_json::Value::Null);
@@ -614,6 +614,10 @@ impl DocxServer {
             Some("business:invoice") => engine::create_invoice(&mut doc, &f),
             Some("business:newsletter") => engine::create_newsletter(&mut doc, &f),
             Some("business:academic") => engine::create_academic(&mut doc, &f),
+            Some("business:proposal") => engine::create_proposal(&mut doc, &f),
+            Some("business:agenda") => engine::create_agenda(&mut doc, &f),
+            Some("business:press_release") => engine::create_press_release(&mut doc, &f),
+            Some("business:certificate") => engine::create_certificate(&mut doc, &f),
             _ => {}
         }
         let mut store = self.store.lock().await;
