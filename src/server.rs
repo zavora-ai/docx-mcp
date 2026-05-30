@@ -442,30 +442,31 @@ impl DocxServer {
                 para = para.page_break_before(true);
             }
 
-            // Apply style-specific formatting
+            // Apply style. Headings/Title/Subtitle use NAMED paragraph styles
+            // (via para.style) so the TOC scanner detects them and Word shows
+            // them in the Styles gallery + navigation pane. Other cases keep
+            // direct formatting since no named style ships for them.
             let style = input.style.as_deref();
             match style {
                 Some("Heading1") => {
-                    para = para.alignment(zavora_docx::Alignment::Center)
-                        .space_before(zavora_docx::Length::pt(24.0))
-                        .space_after(zavora_docx::Length::pt(12.0))
-                        .keep_with_next(true)
-                        .outline_level(0);
-                    para.add_run(&input.text).font("Garamond").size(24.0).bold(true);
+                    para = para.style("Heading1");
+                    para.add_run(&input.text);
                 }
                 Some("Heading2") => {
-                    para = para.space_before(zavora_docx::Length::pt(18.0))
-                        .space_after(zavora_docx::Length::pt(6.0))
-                        .keep_with_next(true)
-                        .outline_level(1);
-                    para.add_run(&input.text).font("Garamond").size(14.0).bold(true);
+                    para = para.style("Heading2");
+                    para.add_run(&input.text);
                 }
                 Some("Heading3") => {
-                    para = para.space_before(zavora_docx::Length::pt(12.0))
-                        .space_after(zavora_docx::Length::pt(4.0))
-                        .keep_with_next(true)
-                        .outline_level(2);
-                    para.add_run(&input.text).font("Garamond").size(12.0).bold(true);
+                    para = para.style("Heading3");
+                    para.add_run(&input.text);
+                }
+                Some("TitlePage") => {
+                    para = para.style("Title").alignment(zavora_docx::Alignment::Center);
+                    para.add_run(&input.text);
+                }
+                Some("Subtitle") => {
+                    para = para.style("Subtitle").alignment(zavora_docx::Alignment::Center);
+                    para.add_run(&input.text);
                 }
                 Some("BodyTextIndent") => {
                     para = para.first_line_indent(zavora_docx::Length::inches(0.3))
@@ -476,14 +477,6 @@ impl DocxServer {
                     para = para.alignment(zavora_docx::Alignment::Center)
                         .space_after(zavora_docx::Length::pt(6.0));
                     para.add_run(&input.text).font("Garamond").size(12.0).small_caps(true);
-                }
-                Some("TitlePage") => {
-                    para = para.alignment(zavora_docx::Alignment::Center);
-                    para.add_run(&input.text).font("Garamond").size(28.0).bold(true);
-                }
-                Some("Subtitle") => {
-                    para = para.alignment(zavora_docx::Alignment::Center);
-                    para.add_run(&input.text).font("Garamond").size(14.0).italic(true);
                 }
                 Some("Author") => {
                     para = para.alignment(zavora_docx::Alignment::Center);
@@ -557,11 +550,11 @@ impl DocxServer {
         })
     }
 
-    #[tool(description = "Insert a linked Table of Contents at the given position")]
+    #[tool(description = "Insert a linked Table of Contents at the given position. IMPORTANT: call this AFTER all headings have been added — it scans for paragraphs styled Heading1/2/3 and builds entries with page numbers. Apply heading styles via insert_paragraph with style=Heading1/2/3 (not direct formatting), or the TOC will be empty. Returns headings_found.")]
     async fn add_toc(&self, Parameters(input): Parameters<TocInput>) -> String {
         with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
-            doc.insert_toc(input.index, 3);
-            serde_json::json!({"index": input.index}).to_string()
+            let found = doc.insert_toc(input.index, 3);
+            serde_json::json!({"index": input.index, "headings_found": found}).to_string()
         })
     }
 
