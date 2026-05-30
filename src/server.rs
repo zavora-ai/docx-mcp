@@ -1448,14 +1448,20 @@ impl DocxServer {
     #[tool(description = "Mark text in a paragraph as commented. First call add_comment to create the comment, then use this to mark the range.")]
     async fn add_comment_range(&self, Parameters(input): Parameters<CommentRangeInput>) -> String {
         with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
-            match doc.paragraph_mut(input.paragraph_index) {
+            let ok = match doc.paragraph_mut(input.paragraph_index) {
                 Some(mut para) => {
                     para.comment_start(input.comment_id);
                     para.add_run(&input.commented_text);
                     para.comment_end(input.comment_id);
-                    serde_json::json!({"added": true}).to_string()
+                    true
                 }
-                None => serde_json::json!({"error": "INDEX_OUT_OF_BOUNDS"}).to_string(),
+                None => false,
+            };
+            if ok {
+                doc.set_comment_anchor(input.comment_id, input.paragraph_index);
+                serde_json::json!({"added": true}).to_string()
+            } else {
+                serde_json::json!({"error": "INDEX_OUT_OF_BOUNDS"}).to_string()
             }
         })
     }
