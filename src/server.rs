@@ -296,7 +296,7 @@ pub struct DeleteInput { pub document_handle: String, pub index: usize }
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
 pub struct UpdateParaInput { pub document_handle: String, pub index: usize, pub text: String }
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
-pub struct RunFormatInput { pub document_handle: String, pub paragraph_index: usize, pub text: String, pub bold: Option<bool>, pub italic: Option<bool>, pub underline: Option<bool>, pub font: Option<String>, pub size: Option<f64>, pub color: Option<String> }
+pub struct RunFormatInput { pub document_handle: String, pub paragraph_index: usize, pub text: String, pub bold: Option<bool>, pub italic: Option<bool>, pub underline: Option<bool>, pub font: Option<String>, pub size: Option<f64>, pub color: Option<String>, pub language: Option<String> }
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
 pub struct FieldInput { pub document_handle: String, pub paragraph_index: usize, pub instruction: String, pub cached: Option<String> }
@@ -447,6 +447,9 @@ pub struct HyperlinkInput { pub document_handle: String, pub paragraph_index: us
 pub struct BookmarkInput { pub document_handle: String, pub paragraph_index: usize, pub id: u32, pub name: String }
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct CrossRefInput { pub document_handle: String, pub paragraph_index: usize, pub bookmark_name: String }
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
 pub struct CommentInput { pub document_handle: String, pub id: u32, pub author: String, pub text: String }
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
@@ -561,7 +564,7 @@ macro_rules! with_doc {
 #[tool_router(server_handler)]
 impl DocxServer {
     #[tool(description = "Create a new DOCX document. format: 'kdp:technical' (6x9), 'kdp:novel' (5.25x8), 'kdp:cookbook' (8x10), 'kdp:children' (8.5x8.5 square), 'kdp:interior_design' (8.5x11), 'kdp:encyclopedia' (8.5x11 2-col), 'kdp:manga' (5x7.5), or omit for blank.")]
-    async fn create_document(&self, Parameters(input): Parameters<CreateInput>) -> String {
+    pub async fn create_document(&self, Parameters(input): Parameters<CreateInput>) -> String {
         let mut doc = zavora_docx::Document::new();
         match input.format.as_deref() {
             Some("kdp:technical" | "kdp") => engine::create_kdp_technical(&mut doc),
@@ -579,7 +582,7 @@ impl DocxServer {
     }
 
     #[tool(description = "Create a professionally-styled novel with author-specific settings (trim size, font, spacing). Sets justified body text, widow control, chapter-opener heading style, and a running header. Use insert_paragraph with style=Heading1 for chapter titles (drives the TOC), TitlePage/Subtitle/Author for the title page, and BodyText/BodyTextIndent for prose.")]
-    async fn create_novel(&self, Parameters(input): Parameters<NovelInput>) -> String {
+    pub async fn create_novel(&self, Parameters(input): Parameters<NovelInput>) -> String {
         let mut doc = zavora_docx::Document::new();
         let cfg = engine::NovelConfig {
             title: input.title,
@@ -598,7 +601,7 @@ impl DocxServer {
     }
 
     #[tool(description = "Open an existing .docx file from disk")]
-    async fn open_document(&self, Parameters(input): Parameters<OpenInput>) -> String {
+    pub async fn open_document(&self, Parameters(input): Parameters<OpenInput>) -> String {
         match zavora_docx::Document::open(&input.file_path) {
             Ok(doc) => {
                 let mut store = self.store.lock().await;
@@ -610,7 +613,7 @@ impl DocxServer {
     }
 
     #[tool(description = "Save document to disk as .docx")]
-    async fn save_document(&self, Parameters(input): Parameters<SaveInput>) -> String {
+    pub async fn save_document(&self, Parameters(input): Parameters<SaveInput>) -> String {
         with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
             match doc.save(&input.output_path) {
                 Ok(_) => serde_json::json!({"saved": input.output_path}).to_string(),
@@ -620,7 +623,7 @@ impl DocxServer {
     }
 
     #[tool(description = "Close a document and free memory")]
-    async fn close_document(&self, Parameters(input): Parameters<HandleInput>) -> String {
+    pub async fn close_document(&self, Parameters(input): Parameters<HandleInput>) -> String {
         let mut store = self.store.lock().await;
         if store.remove(&input.document_handle) {
             serde_json::json!({"closed": true}).to_string()
@@ -630,7 +633,7 @@ impl DocxServer {
     }
 
     #[tool(description = "Get document info: paragraph count, table count, word count")]
-    async fn describe_document(&self, Parameters(input): Parameters<HandleInput>) -> String {
+    pub async fn describe_document(&self, Parameters(input): Parameters<HandleInput>) -> String {
         with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
             serde_json::json!({
                 "paragraphs": doc.paragraph_count(),
@@ -642,7 +645,7 @@ impl DocxServer {
     }
 
     #[tool(description = "Insert a paragraph with optional style and page break. Styles: Heading1, Heading2, Heading3, BodyText, BodyTextIndent, ChapterNum, TitlePage, Subtitle, Author, Copyright")]
-    async fn insert_paragraph(&self, Parameters(input): Parameters<InsertParaInput>) -> String {
+    pub async fn insert_paragraph(&self, Parameters(input): Parameters<InsertParaInput>) -> String {
         with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
             let mut para = doc.insert_paragraph(input.index, "");
 
@@ -706,7 +709,7 @@ impl DocxServer {
     }
 
     #[tool(description = "Insert a syntax-highlighted code block with gray background (Courier New 9pt). Supports 'rust' highlighting.")]
-    async fn insert_code_block(&self, Parameters(input): Parameters<CodeBlockInput>) -> String {
+    pub async fn insert_code_block(&self, Parameters(input): Parameters<CodeBlockInput>) -> String {
         with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
             let lines = engine::insert_code_block(doc, input.index, &input.code, input.language.as_deref());
             serde_json::json!({"lines_inserted": lines}).to_string()
@@ -714,7 +717,7 @@ impl DocxServer {
     }
 
     #[tool(description = "Insert a callout box with colored background and border (tip=green, warning=orange, note=blue)")]
-    async fn insert_callout(&self, Parameters(input): Parameters<CalloutInput>) -> String {
+    pub async fn insert_callout(&self, Parameters(input): Parameters<CalloutInput>) -> String {
         with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
             engine::insert_callout(doc, input.index, &input.callout_type, &input.text);
             serde_json::json!({"inserted": true}).to_string()
@@ -722,7 +725,7 @@ impl DocxServer {
     }
 
     #[tool(description = "Insert a table at the given position")]
-    async fn add_table(&self, Parameters(input): Parameters<TableInput>) -> String {
+    pub async fn add_table(&self, Parameters(input): Parameters<TableInput>) -> String {
         with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
             doc.insert_table(input.index, input.rows, input.cols);
             serde_json::json!({"index": input.index, "rows": input.rows, "cols": input.cols}).to_string()
@@ -730,7 +733,7 @@ impl DocxServer {
     }
 
     #[tool(description = "Set text in a table cell by table_index (0-based), row, and col.")]
-    async fn set_table_cell(&self, Parameters(input): Parameters<CellInput>) -> String {
+    pub async fn set_table_cell(&self, Parameters(input): Parameters<CellInput>) -> String {
         with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
             let ti = input.table_index.unwrap_or(0);
             match doc.table_mut(ti) {
@@ -744,7 +747,7 @@ impl DocxServer {
     }
 
     #[tool(description = "Add an image from file path")]
-    async fn add_image(&self, Parameters(input): Parameters<ImageInput>) -> String {
+    pub async fn add_image(&self, Parameters(input): Parameters<ImageInput>) -> String {
         with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
             let img_data = match std::fs::read(&input.image_path) {
                 Ok(d) => d,
@@ -781,7 +784,7 @@ impl DocxServer {
     }
 
     #[tool(description = "Add a full-bleed page background image anchored to the page at `index` (place a page-break paragraph there first so it covers that page). Text added after flows on top. Use for children's book spreads and full-page interior plates. Returns the anchor index.")]
-    async fn add_page_background(&self, Parameters(input): Parameters<PageBackgroundInput>) -> String {
+    pub async fn add_page_background(&self, Parameters(input): Parameters<PageBackgroundInput>) -> String {
         with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
             let img_data = match std::fs::read(&input.image_path) {
                 Ok(d) => d,
@@ -794,7 +797,7 @@ impl DocxServer {
     }
 
     #[tool(description = "Set document-level settings in settings.xml: default tab stop (inches), mirror margins, track changes, open zoom percent, proofing language (e.g. en-US), update fields on open, and auto hyphenation. Only provided fields are changed; existing settings are preserved.")]
-    async fn set_document_settings(&self, Parameters(input): Parameters<DocumentSettingsInput>) -> String {
+    pub async fn set_document_settings(&self, Parameters(input): Parameters<DocumentSettingsInput>) -> String {
         with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
             if let Some(t) = input.default_tab_stop_inches {
                 doc.set_default_tab_stop(zavora_docx::Length::inches(t));
@@ -822,7 +825,7 @@ impl DocxServer {
     }
 
     #[tool(description = "Add a content control (structured document tag) to the end of the document: text, rich_text, dropdown, combo, date, or checkbox. Provide a tag to identify it; placeholder is the display text. dropdown/combo take options as [display,value] pairs; date takes date_format (e.g. yyyy-MM-dd); checkbox takes checked.")]
-    async fn add_content_control(&self, Parameters(input): Parameters<ContentControlInput>) -> String {
+    pub async fn add_content_control(&self, Parameters(input): Parameters<ContentControlInput>) -> String {
         with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
             let opts = || input.options.clone().unwrap_or_default()
                 .into_iter().map(|o| (o[0].clone(), o[1].clone())).collect::<Vec<_>>();
@@ -842,7 +845,7 @@ impl DocxServer {
     }
 
     #[tool(description = "Add a block-level mathematical equation from a LaTeX-subset string. Supports \\frac{}{}, ^ and _ (superscript/subscript), \\sqrt{} and \\sqrt[n]{}, \\sum/\\int/\\prod with _/^ limits, \\left(...\\right), functions (\\sin, \\cos, \\log, \\ln, \\lim), Greek letters (\\alpha, \\beta, \\pi, ...), and operators (\\cdot, \\times, \\pm, \\leq, \\geq, \\infty, \\to). Renders as a real editable Word equation (OMML).")]
-    async fn add_equation(&self, Parameters(input): Parameters<EquationInput>) -> String {
+    pub async fn add_equation(&self, Parameters(input): Parameters<EquationInput>) -> String {
         with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
             doc.add_equation_latex(&input.latex);
             serde_json::json!({"added": true}).to_string()
@@ -850,7 +853,7 @@ impl DocxServer {
     }
 
     #[tool(description = "Add a rectangular text box (with a border) containing the given lines of text. Width/height default to 3x1.5 inches.")]
-    async fn add_text_box(&self, Parameters(input): Parameters<TextBoxInput>) -> String {
+    pub async fn add_text_box(&self, Parameters(input): Parameters<TextBoxInput>) -> String {
         with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
             let w = zavora_docx::Length::inches(input.width_inches.unwrap_or(3.0));
             let h = zavora_docx::Length::inches(input.height_inches.unwrap_or(1.5));
@@ -860,7 +863,7 @@ impl DocxServer {
     }
 
     #[tool(description = "Add a preset shape (DrawingML). geometry is a preset name: rect, roundRect, ellipse, triangle, diamond, rightArrow, leftArrow, star5, hexagon, etc. Optional solid fill_color (hex). Width/height default to 2x2 inches.")]
-    async fn add_shape(&self, Parameters(input): Parameters<ShapeInput>) -> String {
+    pub async fn add_shape(&self, Parameters(input): Parameters<ShapeInput>) -> String {
         with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
             let w = zavora_docx::Length::inches(input.width_inches.unwrap_or(2.0));
             let h = zavora_docx::Length::inches(input.height_inches.unwrap_or(2.0));
@@ -870,7 +873,7 @@ impl DocxServer {
     }
 
     #[tool(description = "Add a native, editable chart (bar, column, line, pie, or area). Provide categories (x-axis labels) and one or more series, each with a name and a value per category. Data labels are configurable: label_position (outEnd/inEnd/ctr/inBase/bestFit), label_show_value/category/percent, and label_color (hex). Defaults place labels outside for readable contrast. Width/height default to 5x3 inches.")]
-    async fn add_chart(&self, Parameters(input): Parameters<ChartInput>) -> String {
+    pub async fn add_chart(&self, Parameters(input): Parameters<ChartInput>) -> String {
         with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
             let kind = match input.kind.as_str() {
                 "bar" => zavora_docx::ChartKind::Bar,
@@ -878,6 +881,7 @@ impl DocxServer {
                 "line" => zavora_docx::ChartKind::Line,
                 "pie" => zavora_docx::ChartKind::Pie,
                 "area" => zavora_docx::ChartKind::Area,
+                "scatter" => zavora_docx::ChartKind::Scatter,
                 other => return serde_json::json!({"error": format!("unknown chart kind: {other}")}).to_string(),
             };
             let chart = zavora_docx::Chart {
@@ -897,7 +901,7 @@ impl DocxServer {
     }
 
     #[tool(description = "Insert a linked Table of Contents at the given position. IMPORTANT: call this AFTER all headings have been added — it scans for paragraphs styled Heading1/2/3 and builds entries with page numbers. Apply heading styles via insert_paragraph with style=Heading1/2/3 (not direct formatting), or the TOC will be empty. Returns headings_found.")]
-    async fn add_toc(&self, Parameters(input): Parameters<TocInput>) -> String {
+    pub async fn add_toc(&self, Parameters(input): Parameters<TocInput>) -> String {
         with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
             let found = doc.insert_toc(input.index, 3);
             serde_json::json!({"index": input.index, "headings_found": found}).to_string()
@@ -905,7 +909,7 @@ impl DocxServer {
     }
 
     #[tool(description = "Insert a scene break (for novels). style: 'asterisks', 'diamond', or 'blank'")]
-    async fn insert_scene_break(&self, Parameters(input): Parameters<SceneBreakInput>) -> String {
+    pub async fn insert_scene_break(&self, Parameters(input): Parameters<SceneBreakInput>) -> String {
         with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
             engine::insert_scene_break(doc, input.index, input.style.as_deref().unwrap_or("asterisks"));
             serde_json::json!({"inserted": true}).to_string()
@@ -913,7 +917,7 @@ impl DocxServer {
     }
 
     #[tool(description = "Insert a best-seller chapter opening: a drop-cap initial letter with the first few words in small caps, then the body text. Use for the FIRST paragraph of each chapter (after the Heading1 chapter title). Pass the whole first paragraph as text.")]
-    async fn insert_chapter_opening(&self, Parameters(input): Parameters<ChapterOpeningInput>) -> String {
+    pub async fn insert_chapter_opening(&self, Parameters(input): Parameters<ChapterOpeningInput>) -> String {
         with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
             engine::insert_chapter_opening(doc, input.index, &input.text, input.font.as_deref().unwrap_or("Garamond"));
             serde_json::json!({"inserted": true, "paragraphs": 2}).to_string()
@@ -921,7 +925,7 @@ impl DocxServer {
     }
 
     #[tool(description = "Set header and/or footer text. Use {{PAGE}} for page numbers.")]
-    async fn set_header_footer(&self, Parameters(input): Parameters<HeaderFooterInput>) -> String {
+    pub async fn set_header_footer(&self, Parameters(input): Parameters<HeaderFooterInput>) -> String {
         with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
             if let Some(h) = &input.header { doc.set_header(h); }
             if let Some(f) = &input.footer { doc.set_footer(f); }
@@ -930,7 +934,7 @@ impl DocxServer {
     }
 
     #[tool(description = "Export document as plain text")]
-    async fn to_plain_text(&self, Parameters(input): Parameters<ExportInput>) -> String {
+    pub async fn to_plain_text(&self, Parameters(input): Parameters<ExportInput>) -> String {
         with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
             let mut text = String::new();
             for para in doc.paragraphs() {
@@ -942,21 +946,21 @@ impl DocxServer {
     }
 
     #[tool(description = "Export document as Markdown. Headings become #/##/###, paragraphs become text blocks.")]
-    async fn to_markdown(&self, Parameters(input): Parameters<ExportInput>) -> String {
+    pub async fn to_markdown(&self, Parameters(input): Parameters<ExportInput>) -> String {
         with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
             serde_json::json!({"markdown": doc.to_markdown()}).to_string()
         })
     }
 
     #[tool(description = "Export document as HTML fragment.")]
-    async fn to_html(&self, Parameters(input): Parameters<ExportInput>) -> String {
+    pub async fn to_html(&self, Parameters(input): Parameters<ExportInput>) -> String {
         with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
             serde_json::json!({"html": doc.to_html_fragment()}).to_string()
         })
     }
 
     #[tool(description = "Export document as PDF. Saves to the given file path.")]
-    async fn save_pdf(&self, Parameters(input): Parameters<SavePdfInput>) -> String {
+    pub async fn save_pdf(&self, Parameters(input): Parameters<SavePdfInput>) -> String {
         with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
             match doc.save_pdf(&input.output_path) {
                 Ok(_) => serde_json::json!({"saved": input.output_path}).to_string(),
@@ -966,7 +970,7 @@ impl DocxServer {
     }
 
     #[tool(description = "Read paragraphs with pagination. Returns text and index for each paragraph.")]
-    async fn read_paragraphs(&self, Parameters(input): Parameters<ReadParasInput>) -> String {
+    pub async fn read_paragraphs(&self, Parameters(input): Parameters<ReadParasInput>) -> String {
         with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
             let offset = input.offset.unwrap_or(0);
             let limit = input.limit.unwrap_or(20);
@@ -980,7 +984,7 @@ impl DocxServer {
     }
 
     #[tool(description = "Read a single paragraph with full detail (text, formatting info).")]
-    async fn read_paragraph(&self, Parameters(input): Parameters<ReadParaInput>) -> String {
+    pub async fn read_paragraph(&self, Parameters(input): Parameters<ReadParaInput>) -> String {
         with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
             let paras = doc.paragraphs();
             if input.index >= paras.len() { return serde_json::json!({"error": "INDEX_OUT_OF_BOUNDS"}).to_string(); }
@@ -990,7 +994,7 @@ impl DocxServer {
     }
 
     #[tool(description = "Read table content as structured rows and cells.")]
-    async fn read_table(&self, Parameters(input): Parameters<ReadTableInput>) -> String {
+    pub async fn read_table(&self, Parameters(input): Parameters<ReadTableInput>) -> String {
         with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
             let tables = doc.tables();
             let ti = input.table_index.unwrap_or(0);
@@ -1008,7 +1012,7 @@ impl DocxServer {
     }
 
     #[tool(description = "Search text across all paragraphs. Returns matching paragraph indices and text.")]
-    async fn search_text(&self, Parameters(input): Parameters<SearchInput>) -> String {
+    pub async fn search_text(&self, Parameters(input): Parameters<SearchInput>) -> String {
         with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
             let query_lower = input.query.to_lowercase();
             let results: Vec<serde_json::Value> = doc.paragraphs().iter().enumerate().filter(|(_, p)| p.text().to_lowercase().contains(&query_lower)).map(|(i, p)| serde_json::json!({"index": i, "text": p.text()})).collect();
@@ -1017,7 +1021,7 @@ impl DocxServer {
     }
 
     #[tool(description = "Find and replace text across all paragraphs. Returns count of replacements made.")]
-    async fn replace_text(&self, Parameters(input): Parameters<ReplaceInput>) -> String {
+    pub async fn replace_text(&self, Parameters(input): Parameters<ReplaceInput>) -> String {
         with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
             let count = doc.replace_text(&input.find, &input.replace);
             serde_json::json!({"find": input.find, "replace": input.replace, "replacements": count}).to_string()
@@ -1025,7 +1029,7 @@ impl DocxServer {
     }
 
     #[tool(description = "Delete content element (paragraph or table) by index.")]
-    async fn delete_content(&self, Parameters(input): Parameters<DeleteInput>) -> String {
+    pub async fn delete_content(&self, Parameters(input): Parameters<DeleteInput>) -> String {
         with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
             if doc.remove_content(input.index) {
                 serde_json::json!({"deleted": true, "index": input.index}).to_string()
@@ -1036,7 +1040,7 @@ impl DocxServer {
     }
 
     #[tool(description = "Update paragraph text at given index (replaces entire paragraph text).")]
-    async fn update_paragraph_text(&self, Parameters(input): Parameters<UpdateParaInput>) -> String {
+    pub async fn update_paragraph_text(&self, Parameters(input): Parameters<UpdateParaInput>) -> String {
         with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
             if input.index >= doc.paragraph_count() { return serde_json::json!({"error": "INDEX_OUT_OF_BOUNDS"}).to_string(); }
             doc.remove_content(input.index);
@@ -1046,7 +1050,7 @@ impl DocxServer {
     }
 
     #[tool(description = "Add a formatted text run to a paragraph. Supports bold, italic, underline, font, size, color.")]
-    async fn insert_run(&self, Parameters(input): Parameters<RunFormatInput>) -> String {
+    pub async fn insert_run(&self, Parameters(input): Parameters<RunFormatInput>) -> String {
         with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
             match doc.paragraph_mut(input.paragraph_index) {
                 Some(mut para) => {
@@ -1056,7 +1060,8 @@ impl DocxServer {
                     if input.bold.unwrap_or(false) { run = run.bold(true); }
                     if input.italic.unwrap_or(false) { run = run.italic(true); }
                     if input.underline.unwrap_or(false) { run = run.underline(true); }
-                    if let Some(c) = &input.color { run.color(c); }
+                    if let Some(c) = &input.color { run = run.color(c); }
+                    if let Some(l) = &input.language { run = run.language(l); }
                     serde_json::json!({"added": true, "paragraph_index": input.paragraph_index}).to_string()
                 }
                 None => serde_json::json!({"error": "INDEX_OUT_OF_BOUNDS"}).to_string(),
@@ -1065,7 +1070,7 @@ impl DocxServer {
     }
 
     #[tool(description = "Add a Word field to a paragraph. instruction is the field code, e.g. 'DATE \\\\@ \"yyyy-MM-dd\"', 'REF bookmarkName', 'SEQ Figure \\\\* ARABIC', 'STYLEREF \"Heading 1\"', 'PAGE', 'NUMPAGES'. Optional cached result text. Word recomputes fields on open when update-fields is enabled (see set_document_settings update_fields).")]
-    async fn add_field(&self, Parameters(input): Parameters<FieldInput>) -> String {
+    pub async fn add_field(&self, Parameters(input): Parameters<FieldInput>) -> String {
         with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
             match doc.paragraph_mut(input.paragraph_index) {
                 Some(mut para) => {
@@ -1078,7 +1083,7 @@ impl DocxServer {
     }
 
     #[tool(description = "Set paragraph formatting: alignment (left, center, right, justify), spacing, line spacing.")]
-    async fn set_paragraph_format(&self, Parameters(input): Parameters<ParaFormatInput>) -> String {
+    pub async fn set_paragraph_format(&self, Parameters(input): Parameters<ParaFormatInput>) -> String {
         with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
             match doc.paragraph_mut(input.index) {
                 Some(mut para) => {
@@ -1101,7 +1106,7 @@ impl DocxServer {
     }
 
     #[tool(description = "Create a bulleted or numbered list. list_type: 'bullet' or 'numbered'.")]
-    async fn add_list(&self, Parameters(input): Parameters<ListInput>) -> String {
+    pub async fn add_list(&self, Parameters(input): Parameters<ListInput>) -> String {
         with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
             let is_numbered = input.list_type.as_deref() == Some("numbered");
             for item in &input.items {
@@ -1113,7 +1118,7 @@ impl DocxServer {
     }
 
     #[tool(description = "Insert a table with headers and pre-populated row data. This is the recommended way to create tables with content.")]
-    async fn insert_table_with_data(&self, Parameters(input): Parameters<TableWithDataInput>) -> String {
+    pub async fn insert_table_with_data(&self, Parameters(input): Parameters<TableWithDataInput>) -> String {
         with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
             let cols = input.headers.len();
             let rows = input.rows.len() + 1; // +1 for header
@@ -1133,7 +1138,7 @@ impl DocxServer {
     }
 
     #[tool(description = "Merge table cells. direction: 'horizontal' (grid_span across columns) or 'vertical' (v_merge across rows). span = number of cells to merge.")]
-    async fn merge_table_cells(&self, Parameters(input): Parameters<MergeCellsInput>) -> String {
+    pub async fn merge_table_cells(&self, Parameters(input): Parameters<MergeCellsInput>) -> String {
         with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
             let ti = input.table_index.unwrap_or(0);
             match doc.table_mut(ti) {
@@ -1158,7 +1163,7 @@ impl DocxServer {
     }
 
     #[tool(description = "Add a row to an existing table with the given cell values.")]
-    async fn add_table_row(&self, Parameters(input): Parameters<AddRowInput>) -> String {
+    pub async fn add_table_row(&self, Parameters(input): Parameters<AddRowInput>) -> String {
         with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
             let ti = input.table_index.unwrap_or(0);
             match doc.table_mut(ti) {
@@ -1179,7 +1184,7 @@ impl DocxServer {
     }
 
     #[tool(description = "Set page layout: size, orientation, margins, columns, gutter. All measurements in inches.")]
-    async fn set_page_layout(&self, Parameters(input): Parameters<PageLayoutInput>) -> String {
+    pub async fn set_page_layout(&self, Parameters(input): Parameters<PageLayoutInput>) -> String {
         with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
             if let (Some(w), Some(h)) = (input.width, input.height) {
                 doc.set_page_size(zavora_docx::Length::inches(w), zavora_docx::Length::inches(h));
@@ -1208,7 +1213,7 @@ impl DocxServer {
     }
 
     #[tool(description = "Set document metadata: title, author, subject, keywords.")]
-    async fn set_metadata(&self, Parameters(input): Parameters<SetMetadataInput>) -> String {
+    pub async fn set_metadata(&self, Parameters(input): Parameters<SetMetadataInput>) -> String {
         with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
             if let Some(t) = &input.title { doc.set_title(t); }
             if let Some(a) = &input.author { doc.set_author(a); }
@@ -1221,7 +1226,7 @@ impl DocxServer {
     }
 
     #[tool(description = "Get document metadata: title, author, subject, keywords, word count.")]
-    async fn get_metadata(&self, Parameters(input): Parameters<HandleInput>) -> String {
+    pub async fn get_metadata(&self, Parameters(input): Parameters<HandleInput>) -> String {
         with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
             serde_json::json!({
                 "title": doc.title(),
@@ -1234,7 +1239,7 @@ impl DocxServer {
     }
 
     #[tool(description = "Merge another document into this one. Appends all content with an optional section break between them.")]
-    async fn merge_documents(&self, Parameters(input): Parameters<MergeDocumentsInput>) -> String {
+    pub async fn merge_documents(&self, Parameters(input): Parameters<MergeDocumentsInput>) -> String {
         let other = match zavora_docx::Document::open(&input.other_path) {
             Ok(d) => d,
             Err(e) => return serde_json::json!({"error": e.to_string()}).to_string(),
@@ -1257,7 +1262,7 @@ impl DocxServer {
     }
 
     #[tool(description = "Render a document page as PNG image. Returns the output file path.")]
-    async fn render_page(&self, Parameters(input): Parameters<RenderPageInput>) -> String {
+    pub async fn render_page(&self, Parameters(input): Parameters<RenderPageInput>) -> String {
         with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
             let dpi = input.dpi.unwrap_or(150.0);
             match doc.render_page_to_png(input.page_index, dpi) {
@@ -1274,7 +1279,7 @@ impl DocxServer {
     }
 
     #[tool(description = "Get document outline (heading structure). Returns nested heading tree with levels and text.")]
-    async fn document_outline(&self, Parameters(input): Parameters<HandleInput>) -> String {
+    pub async fn document_outline(&self, Parameters(input): Parameters<HandleInput>) -> String {
         with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
             let outline = doc.document_outline();
             let items: Vec<serde_json::Value> = outline.iter().map(|node| {
@@ -1285,7 +1290,7 @@ impl DocxServer {
     }
 
     #[tool(description = "Find and replace using regex pattern. Supports capture groups ($1, $2) in replacement.")]
-    async fn replace_regex(&self, Parameters(input): Parameters<RegexReplaceInput>) -> String {
+    pub async fn replace_regex(&self, Parameters(input): Parameters<RegexReplaceInput>) -> String {
         with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
             match doc.replace_regex(&input.pattern, &input.replacement) {
                 Ok(count) => serde_json::json!({"replacements": count}).to_string(),
@@ -1295,7 +1300,7 @@ impl DocxServer {
     }
 
     #[tool(description = "Format a table: width, alignment, borders, cell margins.")]
-    async fn format_table(&self, Parameters(input): Parameters<FormatTableInput>) -> String {
+    pub async fn format_table(&self, Parameters(input): Parameters<FormatTableInput>) -> String {
         with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
             let ti = input.table_index.unwrap_or(0);
             match doc.table_mut(ti) {
@@ -1337,7 +1342,7 @@ impl DocxServer {
     }
 
     #[tool(description = "Format a table cell: shading, vertical alignment, width, no-wrap.")]
-    async fn format_table_cell(&self, Parameters(input): Parameters<FormatCellInput>) -> String {
+    pub async fn format_table_cell(&self, Parameters(input): Parameters<FormatCellInput>) -> String {
         with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
             let ti = input.table_index.unwrap_or(0);
             match doc.table_mut(ti) {
@@ -1364,7 +1369,7 @@ impl DocxServer {
     }
 
     #[tool(description = "Insert a section break at the given index. Allows changing page layout for subsequent content.")]
-    async fn add_section_break(&self, Parameters(input): Parameters<SectionBreakInput>) -> String {
+    pub async fn add_section_break(&self, Parameters(input): Parameters<SectionBreakInput>) -> String {
         with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
             let bt = match input.break_type.as_deref() {
                 Some("continuous") => zavora_docx::SectionBreak::Continuous,
@@ -1389,7 +1394,7 @@ impl DocxServer {
     }
 
     #[tool(description = "Audit document for accessibility issues: missing alt text, empty headings, skipped heading levels, low contrast.")]
-    async fn audit_accessibility(&self, Parameters(input): Parameters<HandleInput>) -> String {
+    pub async fn audit_accessibility(&self, Parameters(input): Parameters<HandleInput>) -> String {
         with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
             let issues = doc.audit_accessibility();
             let items: Vec<serde_json::Value> = issues.iter().map(|issue| {
@@ -1405,7 +1410,7 @@ impl DocxServer {
     // ── New Features: Footnotes, Hyperlinks, Bookmarks, Comments, Watermarks, Track Changes, Form Fields, Protection ──
 
     #[tool(description = "Add a footnote. Returns the footnote ID to use with add_footnote_ref.")]
-    async fn add_footnote(&self, Parameters(input): Parameters<FootnoteInput>) -> String {
+    pub async fn add_footnote(&self, Parameters(input): Parameters<FootnoteInput>) -> String {
         with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
             let id = doc.add_footnote(&input.text);
             serde_json::json!({"footnote_id": id}).to_string()
@@ -1413,7 +1418,7 @@ impl DocxServer {
     }
 
     #[tool(description = "Add a footnote reference (superscript number) to a paragraph. Use the ID from add_footnote.")]
-    async fn add_footnote_ref(&self, Parameters(input): Parameters<FootnoteRefInput>) -> String {
+    pub async fn add_footnote_ref(&self, Parameters(input): Parameters<FootnoteRefInput>) -> String {
         with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
             match doc.paragraph_mut(input.paragraph_index) {
                 Some(mut para) => {
@@ -1426,7 +1431,7 @@ impl DocxServer {
     }
 
     #[tool(description = "Add a clickable hyperlink to a paragraph. Creates blue underlined text linking to the URL.")]
-    async fn add_hyperlink(&self, Parameters(input): Parameters<HyperlinkInput>) -> String {
+    pub async fn add_hyperlink(&self, Parameters(input): Parameters<HyperlinkInput>) -> String {
         with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
             let rel_id = doc.add_hyperlink_rel(&input.url);
             match doc.paragraph_mut(input.paragraph_index) {
@@ -1441,7 +1446,7 @@ impl DocxServer {
     }
 
     #[tool(description = "Add a bookmark to a paragraph for cross-referencing.")]
-    async fn add_bookmark(&self, Parameters(input): Parameters<BookmarkInput>) -> String {
+    pub async fn add_bookmark(&self, Parameters(input): Parameters<BookmarkInput>) -> String {
         with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
             match doc.paragraph_mut(input.paragraph_index) {
                 Some(mut para) => {
@@ -1453,8 +1458,21 @@ impl DocxServer {
         })
     }
 
+    #[tool(description = "Insert a cross-reference (REF field) to a bookmark by name in the given paragraph. Shows the bookmarked text and updates when fields refresh. Create the bookmark first with add_bookmark.")]
+    pub async fn cross_reference(&self, Parameters(input): Parameters<CrossRefInput>) -> String {
+        with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
+            match doc.paragraph_mut(input.paragraph_index) {
+                Some(mut para) => {
+                    para.cross_reference(&input.bookmark_name);
+                    serde_json::json!({"added": true}).to_string()
+                }
+                None => serde_json::json!({"error": "INDEX_OUT_OF_BOUNDS"}).to_string(),
+            }
+        })
+    }
+
     #[tool(description = "Add a comment to the document. Use add_comment_range to mark which text the comment applies to.")]
-    async fn add_comment(&self, Parameters(input): Parameters<CommentInput>) -> String {
+    pub async fn add_comment(&self, Parameters(input): Parameters<CommentInput>) -> String {
         with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
             doc.add_comment(input.id, &input.author, &input.text);
             serde_json::json!({"added": true, "comment_id": input.id}).to_string()
@@ -1462,7 +1480,7 @@ impl DocxServer {
     }
 
     #[tool(description = "Mark text in a paragraph as commented. First call add_comment to create the comment, then use this to mark the range.")]
-    async fn add_comment_range(&self, Parameters(input): Parameters<CommentRangeInput>) -> String {
+    pub async fn add_comment_range(&self, Parameters(input): Parameters<CommentRangeInput>) -> String {
         with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
             let ok = match doc.paragraph_mut(input.paragraph_index) {
                 Some(mut para) => {
@@ -1483,7 +1501,7 @@ impl DocxServer {
     }
 
     #[tool(description = "Add a threaded reply to an existing comment. Provide a new unique id, the parent_id of the comment being replied to, author, and text.")]
-    async fn reply_to_comment(&self, Parameters(input): Parameters<CommentReplyInput>) -> String {
+    pub async fn reply_to_comment(&self, Parameters(input): Parameters<CommentReplyInput>) -> String {
         with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
             doc.add_comment_reply(input.id, input.parent_id, &input.author, &input.text);
             serde_json::json!({"added": true, "comment_id": input.id}).to_string()
@@ -1491,7 +1509,7 @@ impl DocxServer {
     }
 
     #[tool(description = "Mark a comment (by id) as resolved/done.")]
-    async fn resolve_comment(&self, Parameters(input): Parameters<ResolveCommentInput>) -> String {
+    pub async fn resolve_comment(&self, Parameters(input): Parameters<ResolveCommentInput>) -> String {
         with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
             doc.resolve_comment(input.id);
             serde_json::json!({"resolved": true, "comment_id": input.id}).to_string()
@@ -1499,7 +1517,7 @@ impl DocxServer {
     }
 
     #[tool(description = "Set a diagonal text watermark on every page (e.g. 'DRAFT', 'CONFIDENTIAL').")]
-    async fn set_watermark(&self, Parameters(input): Parameters<WatermarkInput>) -> String {
+    pub async fn set_watermark(&self, Parameters(input): Parameters<WatermarkInput>) -> String {
         with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
             let color = input.color.as_deref().unwrap_or("C0C0C0");
             doc.set_text_watermark(&input.text, color, input.rotation);
@@ -1508,7 +1526,7 @@ impl DocxServer {
     }
 
     #[tool(description = "Add tracked insertion (text shown as added in review mode).")]
-    async fn add_tracked_insert(&self, Parameters(input): Parameters<TrackedInsertInput>) -> String {
+    pub async fn add_tracked_insert(&self, Parameters(input): Parameters<TrackedInsertInput>) -> String {
         with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
             match doc.paragraph_mut(input.paragraph_index) {
                 Some(mut para) => {
@@ -1521,7 +1539,7 @@ impl DocxServer {
     }
 
     #[tool(description = "Add tracked deletion (text shown as strikethrough in review mode).")]
-    async fn add_tracked_delete(&self, Parameters(input): Parameters<TrackedDeleteInput>) -> String {
+    pub async fn add_tracked_delete(&self, Parameters(input): Parameters<TrackedDeleteInput>) -> String {
         with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
             match doc.paragraph_mut(input.paragraph_index) {
                 Some(mut para) => {
@@ -1534,7 +1552,7 @@ impl DocxServer {
     }
 
     #[tool(description = "Add a text input form field to a paragraph.")]
-    async fn add_form_text_field(&self, Parameters(input): Parameters<TextFieldInput>) -> String {
+    pub async fn add_form_text_field(&self, Parameters(input): Parameters<TextFieldInput>) -> String {
         with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
             match doc.paragraph_mut(input.paragraph_index) {
                 Some(mut para) => {
@@ -1548,7 +1566,7 @@ impl DocxServer {
     }
 
     #[tool(description = "Add a checkbox form field to a paragraph.")]
-    async fn add_form_checkbox(&self, Parameters(input): Parameters<CheckboxInput>) -> String {
+    pub async fn add_form_checkbox(&self, Parameters(input): Parameters<CheckboxInput>) -> String {
         with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
             match doc.paragraph_mut(input.paragraph_index) {
                 Some(mut para) => {
@@ -1562,7 +1580,7 @@ impl DocxServer {
     }
 
     #[tool(description = "Add a dropdown form field to a paragraph.")]
-    async fn add_form_dropdown(&self, Parameters(input): Parameters<DropdownInput>) -> String {
+    pub async fn add_form_dropdown(&self, Parameters(input): Parameters<DropdownInput>) -> String {
         with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
             match doc.paragraph_mut(input.paragraph_index) {
                 Some(mut para) => {
@@ -1577,7 +1595,7 @@ impl DocxServer {
     }
 
     #[tool(description = "Protect the document. Types: 'readonly', 'forms' (only form fields editable), 'comments' (only comments allowed), 'trackedChanges'.")]
-    async fn protect_document(&self, Parameters(input): Parameters<ProtectInput>) -> String {
+    pub async fn protect_document(&self, Parameters(input): Parameters<ProtectInput>) -> String {
         with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
             match input.protection_type.as_str() {
                 "readonly" => doc.protect_readonly(),
@@ -1591,7 +1609,7 @@ impl DocxServer {
     }
 
     #[tool(description = "Remove document protection.")]
-    async fn unprotect_document(&self, Parameters(input): Parameters<HandleInput>) -> String {
+    pub async fn unprotect_document(&self, Parameters(input): Parameters<HandleInput>) -> String {
         with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
             doc.unprotect();
             serde_json::json!({"unprotected": true}).to_string()
@@ -1599,7 +1617,7 @@ impl DocxServer {
     }
 
     #[tool(description = "Apply a drop cap to a paragraph (large first letter spanning multiple lines, for chapter openers).")]
-    async fn set_drop_cap(&self, Parameters(input): Parameters<DropCapInput>) -> String {
+    pub async fn set_drop_cap(&self, Parameters(input): Parameters<DropCapInput>) -> String {
         with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
             match doc.paragraph_mut(input.paragraph_index) {
                 Some(para) => { para.drop_cap(input.lines); serde_json::json!({"set": true}).to_string() }
@@ -1609,7 +1627,7 @@ impl DocxServer {
     }
 
     #[tool(description = "Add text with a w14 effect (shadow, glow, outline, or reflection). These are Word 2010+ effects.")]
-    async fn add_text_effect(&self, Parameters(input): Parameters<TextEffectInput>) -> String {
+    pub async fn add_text_effect(&self, Parameters(input): Parameters<TextEffectInput>) -> String {
         with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
             match doc.paragraph_mut(input.paragraph_index) {
                 Some(mut para) => {
@@ -1631,7 +1649,7 @@ impl DocxServer {
     }
 
     #[tool(description = "Add a run with a theme color (accent1-6, dk1, dk2, lt1, lt2, hlink). Colors auto-update when theme changes.")]
-    async fn add_theme_colored_text(&self, Parameters(input): Parameters<ThemeColorRunInput>) -> String {
+    pub async fn add_theme_colored_text(&self, Parameters(input): Parameters<ThemeColorRunInput>) -> String {
         with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
             match doc.paragraph_mut(input.paragraph_index) {
                 Some(mut para) => {
@@ -1644,7 +1662,7 @@ impl DocxServer {
     }
 
     #[tool(description = "Apply banded rows and header styling to a table. Makes tables look professional with alternating colors.")]
-    async fn style_table_banded(&self, Parameters(input): Parameters<BandedTableInput>) -> String {
+    pub async fn style_table_banded(&self, Parameters(input): Parameters<BandedTableInput>) -> String {
         with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
             let ti = input.table_index.unwrap_or(0);
             match doc.table_mut(ti) {
@@ -1661,7 +1679,7 @@ impl DocxServer {
     }
 
     #[tool(description = "Enable line numbering in the document margin (for legal/academic documents).")]
-    async fn set_line_numbering(&self, Parameters(input): Parameters<LineNumberingInput>) -> String {
+    pub async fn set_line_numbering(&self, Parameters(input): Parameters<LineNumberingInput>) -> String {
         with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
             doc.set_line_numbering(input.count_by.unwrap_or(1), input.restart.as_deref().unwrap_or("continuous"));
             serde_json::json!({"set": true}).to_string()
@@ -1669,7 +1687,7 @@ impl DocxServer {
     }
 
     #[tool(description = "Create a list with custom numbering: Roman numerals, letters, or custom bullet characters (★, →, ◆).")]
-    async fn add_custom_list(&self, Parameters(input): Parameters<CustomListInput>) -> String {
+    pub async fn add_custom_list(&self, Parameters(input): Parameters<CustomListInput>) -> String {
         with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
             for item in &input.items {
                 doc.add_custom_list_item(item, 0, &input.format, input.bullet_char.as_deref());
@@ -1679,7 +1697,7 @@ impl DocxServer {
     }
 
     #[tool(description = "Set the document theme (fonts and colors). Controls the look of all theme-colored text.")]
-    async fn set_theme(&self, Parameters(input): Parameters<ThemeInput>) -> String {
+    pub async fn set_theme(&self, Parameters(input): Parameters<ThemeInput>) -> String {
         with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
             let defaults = ["4472C4", "ED7D31", "A5A5A5", "FFC000", "5B9BD5", "70AD47"];
             let accents = input.accent_colors.as_ref();

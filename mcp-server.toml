@@ -1,0 +1,543 @@
+server_id = "docx_mcp"
+display_name = "DOCX"
+version = "0.1.0"
+domain = "documents"
+sdk_version = "0.1.0"
+risk_level = "low"
+writes_allowed = "yes"
+transports = ["stdio"]
+credentials = []
+governance_gates = []
+environments = ["development", "staging", "production"]
+
+[[tools]]
+name = "create_document"
+description = "Create a new DOCX document. format: 'kdp:technical' (6x9), 'kdp:novel' (5.25x8), 'kdp:cookbook' (8x10), 'kdp:children' (8.5x8.5 square), ..."
+risk_class = "local_write"
+requires_approval = false
+credential_bindings = []
+
+[[tools]]
+name = "create_novel"
+description = "Create a professionally-styled novel with author-specific settings (trim size, font, spacing). Sets justified body text, widow control, c..."
+risk_class = "local_write"
+requires_approval = false
+credential_bindings = []
+
+[[tools]]
+name = "open_document"
+description = "Open an existing .docx file from disk"
+risk_class = "local_write"
+requires_approval = false
+credential_bindings = []
+
+[[tools]]
+name = "save_document"
+description = "Save document to disk as .docx"
+risk_class = "local_write"
+requires_approval = false
+credential_bindings = []
+
+[[tools]]
+name = "close_document"
+description = "Close a document and free memory"
+risk_class = "local_write"
+requires_approval = false
+credential_bindings = []
+
+[[tools]]
+name = "describe_document"
+description = "Get document info: paragraph count, table count, word count"
+risk_class = "read_only"
+requires_approval = false
+credential_bindings = []
+
+[[tools]]
+name = "insert_paragraph"
+description = "Insert a paragraph with optional style and page break. Styles: Heading1, Heading2, Heading3, BodyText, BodyTextIndent, ChapterNum, TitleP..."
+risk_class = "local_write"
+requires_approval = false
+credential_bindings = []
+
+[[tools]]
+name = "insert_code_block"
+description = "Insert a syntax-highlighted code block with gray background (Courier New 9pt). Supports 'rust' highlighting."
+risk_class = "local_write"
+requires_approval = false
+credential_bindings = []
+
+[[tools]]
+name = "insert_callout"
+description = "Insert a callout box with colored background and border (tip=green, warning=orange, note=blue)"
+risk_class = "local_write"
+requires_approval = false
+credential_bindings = []
+
+[[tools]]
+name = "add_table"
+description = "Insert a table at the given position"
+risk_class = "local_write"
+requires_approval = false
+credential_bindings = []
+
+[[tools]]
+name = "set_table_cell"
+description = "Set text in a table cell by table_index (0-based), row, and col."
+risk_class = "local_write"
+requires_approval = false
+credential_bindings = []
+
+[[tools]]
+name = "add_image"
+description = "Add an image from file path"
+risk_class = "local_write"
+requires_approval = false
+credential_bindings = []
+
+[[tools]]
+name = "add_page_background"
+description = "Add a full-bleed page background image anchored to the page at `index` (place a page-break paragraph there first so it covers that page)...."
+risk_class = "local_write"
+requires_approval = false
+credential_bindings = []
+
+[[tools]]
+name = "set_document_settings"
+description = "Set document-level settings in settings.xml: default tab stop (inches), mirror margins, track changes, open zoom percent, proofing langua..."
+risk_class = "local_write"
+requires_approval = false
+credential_bindings = []
+
+[[tools]]
+name = "add_content_control"
+description = "Add a content control (structured document tag) to the end of the document: text, rich_text, dropdown, combo, date, or checkbox. Provide ..."
+risk_class = "local_write"
+requires_approval = false
+credential_bindings = []
+
+[[tools]]
+name = "add_equation"
+description = "Add a block-level mathematical equation from a LaTeX-subset string. Supports \\frac{}{}, ^ and _ (superscript/subscript), \\sqrt{} and \\sqr..."
+risk_class = "local_write"
+requires_approval = false
+credential_bindings = []
+
+[[tools]]
+name = "add_text_box"
+description = "Add a rectangular text box (with a border) containing the given lines of text. Width/height default to 3x1.5 inches."
+risk_class = "local_write"
+requires_approval = false
+credential_bindings = []
+
+[[tools]]
+name = "add_shape"
+description = "Add a preset shape (DrawingML). geometry is a preset name: rect, roundRect, ellipse, triangle, diamond, rightArrow, leftArrow, star5, hex..."
+risk_class = "local_write"
+requires_approval = false
+credential_bindings = []
+
+[[tools]]
+name = "add_chart"
+description = "Add a native, editable chart (bar, column, line, pie, or area). Provide categories (x-axis labels) and one or more series, each with a na..."
+risk_class = "local_write"
+requires_approval = false
+credential_bindings = []
+
+[[tools]]
+name = "add_toc"
+description = "Insert a linked Table of Contents at the given position. IMPORTANT: call this AFTER all headings have been added — it scans for paragraph..."
+risk_class = "local_write"
+requires_approval = false
+credential_bindings = []
+
+[[tools]]
+name = "insert_scene_break"
+description = "Insert a scene break (for novels). style: 'asterisks', 'diamond', or 'blank'"
+risk_class = "local_write"
+requires_approval = false
+credential_bindings = []
+
+[[tools]]
+name = "insert_chapter_opening"
+description = "Insert a best-seller chapter opening: a drop-cap initial letter with the first few words in small caps, then the body text. Use for the F..."
+risk_class = "local_write"
+requires_approval = false
+credential_bindings = []
+
+[[tools]]
+name = "set_header_footer"
+description = "Set header and/or footer text. Use {{PAGE}} for page numbers."
+risk_class = "local_write"
+requires_approval = false
+credential_bindings = []
+
+[[tools]]
+name = "to_plain_text"
+description = "Export document as plain text"
+risk_class = "read_only"
+requires_approval = false
+credential_bindings = []
+
+[[tools]]
+name = "to_markdown"
+description = "Export document as Markdown. Headings become #/##/###, paragraphs become text blocks."
+risk_class = "read_only"
+requires_approval = false
+credential_bindings = []
+
+[[tools]]
+name = "to_html"
+description = "Export document as HTML fragment."
+risk_class = "read_only"
+requires_approval = false
+credential_bindings = []
+
+[[tools]]
+name = "save_pdf"
+description = "Export document as PDF. Saves to the given file path."
+risk_class = "local_write"
+requires_approval = false
+credential_bindings = []
+
+[[tools]]
+name = "read_paragraphs"
+description = "Read paragraphs with pagination. Returns text and index for each paragraph."
+risk_class = "read_only"
+requires_approval = false
+credential_bindings = []
+
+[[tools]]
+name = "read_paragraph"
+description = "Read a single paragraph with full detail (text, formatting info)."
+risk_class = "read_only"
+requires_approval = false
+credential_bindings = []
+
+[[tools]]
+name = "read_table"
+description = "Read table content as structured rows and cells."
+risk_class = "read_only"
+requires_approval = false
+credential_bindings = []
+
+[[tools]]
+name = "search_text"
+description = "Search text across all paragraphs. Returns matching paragraph indices and text."
+risk_class = "read_only"
+requires_approval = false
+credential_bindings = []
+
+[[tools]]
+name = "replace_text"
+description = "Find and replace text across all paragraphs. Returns count of replacements made."
+risk_class = "local_write"
+requires_approval = false
+credential_bindings = []
+
+[[tools]]
+name = "delete_content"
+description = "Delete content element (paragraph or table) by index."
+risk_class = "local_write"
+requires_approval = false
+credential_bindings = []
+
+[[tools]]
+name = "update_paragraph_text"
+description = "Update paragraph text at given index (replaces entire paragraph text)."
+risk_class = "local_write"
+requires_approval = false
+credential_bindings = []
+
+[[tools]]
+name = "insert_run"
+description = "Add a formatted text run to a paragraph. Supports bold, italic, underline, font, size, color."
+risk_class = "local_write"
+requires_approval = false
+credential_bindings = []
+
+[[tools]]
+name = "add_field"
+description = "Add a Word field to a paragraph. instruction is the field code, e.g. 'DATE \\\\@ \"yyyy-MM-dd\"', 'REF bookmarkName', 'SEQ Figure \\\\* ARABIC'..."
+risk_class = "local_write"
+requires_approval = false
+credential_bindings = []
+
+[[tools]]
+name = "set_paragraph_format"
+description = "Set paragraph formatting: alignment (left, center, right, justify), spacing, line spacing."
+risk_class = "local_write"
+requires_approval = false
+credential_bindings = []
+
+[[tools]]
+name = "add_list"
+description = "Create a bulleted or numbered list. list_type: 'bullet' or 'numbered'."
+risk_class = "local_write"
+requires_approval = false
+credential_bindings = []
+
+[[tools]]
+name = "insert_table_with_data"
+description = "Insert a table with headers and pre-populated row data. This is the recommended way to create tables with content."
+risk_class = "local_write"
+requires_approval = false
+credential_bindings = []
+
+[[tools]]
+name = "merge_table_cells"
+description = "Merge table cells. direction: 'horizontal' (grid_span across columns) or 'vertical' (v_merge across rows). span = number of cells to merge."
+risk_class = "local_write"
+requires_approval = false
+credential_bindings = []
+
+[[tools]]
+name = "add_table_row"
+description = "Add a row to an existing table with the given cell values."
+risk_class = "local_write"
+requires_approval = false
+credential_bindings = []
+
+[[tools]]
+name = "set_page_layout"
+description = "Set page layout: size, orientation, margins, columns, gutter. All measurements in inches."
+risk_class = "local_write"
+requires_approval = false
+credential_bindings = []
+
+[[tools]]
+name = "set_metadata"
+description = "Set document metadata: title, author, subject, keywords."
+risk_class = "local_write"
+requires_approval = false
+credential_bindings = []
+
+[[tools]]
+name = "get_metadata"
+description = "Get document metadata: title, author, subject, keywords, word count."
+risk_class = "read_only"
+requires_approval = false
+credential_bindings = []
+
+[[tools]]
+name = "merge_documents"
+description = "Merge another document into this one. Appends all content with an optional section break between them."
+risk_class = "local_write"
+requires_approval = false
+credential_bindings = []
+
+[[tools]]
+name = "render_page"
+description = "Render a document page as PNG image. Returns the output file path."
+risk_class = "local_write"
+requires_approval = false
+credential_bindings = []
+
+[[tools]]
+name = "document_outline"
+description = "Get document outline (heading structure). Returns nested heading tree with levels and text."
+risk_class = "read_only"
+requires_approval = false
+credential_bindings = []
+
+[[tools]]
+name = "replace_regex"
+description = "Find and replace using regex pattern. Supports capture groups ($1, $2) in replacement."
+risk_class = "local_write"
+requires_approval = false
+credential_bindings = []
+
+[[tools]]
+name = "format_table"
+description = "Format a table: width, alignment, borders, cell margins."
+risk_class = "local_write"
+requires_approval = false
+credential_bindings = []
+
+[[tools]]
+name = "format_table_cell"
+description = "Format a table cell: shading, vertical alignment, width, no-wrap."
+risk_class = "local_write"
+requires_approval = false
+credential_bindings = []
+
+[[tools]]
+name = "add_section_break"
+description = "Insert a section break at the given index. Allows changing page layout for subsequent content."
+risk_class = "local_write"
+requires_approval = false
+credential_bindings = []
+
+[[tools]]
+name = "audit_accessibility"
+description = "Audit document for accessibility issues: missing alt text, empty headings, skipped heading levels, low contrast."
+risk_class = "read_only"
+requires_approval = false
+credential_bindings = []
+
+[[tools]]
+name = "add_footnote"
+description = "Add a footnote. Returns the footnote ID to use with add_footnote_ref."
+risk_class = "local_write"
+requires_approval = false
+credential_bindings = []
+
+[[tools]]
+name = "add_footnote_ref"
+description = "Add a footnote reference (superscript number) to a paragraph. Use the ID from add_footnote."
+risk_class = "local_write"
+requires_approval = false
+credential_bindings = []
+
+[[tools]]
+name = "add_hyperlink"
+description = "Add a clickable hyperlink to a paragraph. Creates blue underlined text linking to the URL."
+risk_class = "local_write"
+requires_approval = false
+credential_bindings = []
+
+[[tools]]
+name = "add_bookmark"
+description = "Add a bookmark to a paragraph for cross-referencing."
+risk_class = "local_write"
+requires_approval = false
+credential_bindings = []
+
+[[tools]]
+name = "cross_reference"
+description = "Insert a cross-reference (REF field) to a bookmark by name in the given paragraph. Shows the bookmarked text and updates when fields refr..."
+risk_class = "local_write"
+requires_approval = false
+credential_bindings = []
+
+[[tools]]
+name = "add_comment"
+description = "Add a comment to the document. Use add_comment_range to mark which text the comment applies to."
+risk_class = "local_write"
+requires_approval = false
+credential_bindings = []
+
+[[tools]]
+name = "add_comment_range"
+description = "Mark text in a paragraph as commented. First call add_comment to create the comment, then use this to mark the range."
+risk_class = "local_write"
+requires_approval = false
+credential_bindings = []
+
+[[tools]]
+name = "reply_to_comment"
+description = "Add a threaded reply to an existing comment. Provide a new unique id, the parent_id of the comment being replied to, author, and text."
+risk_class = "local_write"
+requires_approval = false
+credential_bindings = []
+
+[[tools]]
+name = "resolve_comment"
+description = "Mark a comment (by id) as resolved/done."
+risk_class = "local_write"
+requires_approval = false
+credential_bindings = []
+
+[[tools]]
+name = "set_watermark"
+description = "Set a diagonal text watermark on every page (e.g. 'DRAFT', 'CONFIDENTIAL')."
+risk_class = "local_write"
+requires_approval = false
+credential_bindings = []
+
+[[tools]]
+name = "add_tracked_insert"
+description = "Add tracked insertion (text shown as added in review mode)."
+risk_class = "local_write"
+requires_approval = false
+credential_bindings = []
+
+[[tools]]
+name = "add_tracked_delete"
+description = "Add tracked deletion (text shown as strikethrough in review mode)."
+risk_class = "local_write"
+requires_approval = false
+credential_bindings = []
+
+[[tools]]
+name = "add_form_text_field"
+description = "Add a text input form field to a paragraph."
+risk_class = "local_write"
+requires_approval = false
+credential_bindings = []
+
+[[tools]]
+name = "add_form_checkbox"
+description = "Add a checkbox form field to a paragraph."
+risk_class = "local_write"
+requires_approval = false
+credential_bindings = []
+
+[[tools]]
+name = "add_form_dropdown"
+description = "Add a dropdown form field to a paragraph."
+risk_class = "local_write"
+requires_approval = false
+credential_bindings = []
+
+[[tools]]
+name = "protect_document"
+description = "Protect the document. Types: 'readonly', 'forms' (only form fields editable), 'comments' (only comments allowed), 'trackedChanges'."
+risk_class = "local_write"
+requires_approval = false
+credential_bindings = []
+
+[[tools]]
+name = "unprotect_document"
+description = "Remove document protection."
+risk_class = "local_write"
+requires_approval = false
+credential_bindings = []
+
+[[tools]]
+name = "set_drop_cap"
+description = "Apply a drop cap to a paragraph (large first letter spanning multiple lines, for chapter openers)."
+risk_class = "local_write"
+requires_approval = false
+credential_bindings = []
+
+[[tools]]
+name = "add_text_effect"
+description = "Add text with a w14 effect (shadow, glow, outline, or reflection). These are Word 2010+ effects."
+risk_class = "local_write"
+requires_approval = false
+credential_bindings = []
+
+[[tools]]
+name = "add_theme_colored_text"
+description = "Add a run with a theme color (accent1-6, dk1, dk2, lt1, lt2, hlink). Colors auto-update when theme changes."
+risk_class = "local_write"
+requires_approval = false
+credential_bindings = []
+
+[[tools]]
+name = "style_table_banded"
+description = "Apply banded rows and header styling to a table. Makes tables look professional with alternating colors."
+risk_class = "local_write"
+requires_approval = false
+credential_bindings = []
+
+[[tools]]
+name = "set_line_numbering"
+description = "Enable line numbering in the document margin (for legal/academic documents)."
+risk_class = "local_write"
+requires_approval = false
+credential_bindings = []
+
+[[tools]]
+name = "add_custom_list"
+description = "Create a list with custom numbering: Roman numerals, letters, or custom bullet characters (★, →, ◆)."
+risk_class = "local_write"
+requires_approval = false
+credential_bindings = []
+
+[[tools]]
+name = "set_theme"
+description = "Set the document theme (fonts and colors). Controls the look of all theme-colored text."
+risk_class = "local_write"
+requires_approval = false
+credential_bindings = []

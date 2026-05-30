@@ -1,0 +1,166 @@
+//! MCP integration test: drive the `DocxServer` tool methods directly (the same
+//! entry points the JSON-RPC layer dispatches to) and assert their JSON results.
+//! This commits coverage of the tool surface that was previously only checked
+//! via ad-hoc scripts.
+
+use docx_mcp_server::server::*;
+use rmcp::handler::server::wrapper::Parameters;
+use serde_json::Value;
+
+fn json(s: &str) -> Value {
+    serde_json::from_str(s).expect("tool returned valid JSON")
+}
+
+#[tokio::test]
+async fn tools_build_a_feature_rich_document() {
+    let srv = DocxServer::new();
+
+    // create
+    let r = srv
+        .create_document(Parameters(CreateInput { title: Some("MCP".into()), format: None }))
+        .await;
+    let handle = json(&r)["handle"].as_str().expect("handle").to_string();
+
+    // a paragraph to anchor things on
+    let r = srv
+        .insert_paragraph(Parameters(InsertParaInput {
+            document_handle: handle.clone(),
+            index: 0,
+            text: "Hello world".into(),
+            style: Some("Heading1".into()),
+            page_break_before: None,
+        }))
+        .await;
+    assert_eq!(json(&r)["index"], 0);
+
+    // settings (Phase 1)
+    let r = srv
+        .set_document_settings(Parameters(DocumentSettingsInput {
+            document_handle: handle.clone(),
+            default_tab_stop_inches: Some(0.5),
+            mirror_margins: Some(true),
+            track_changes: None,
+            zoom_percent: Some(120),
+            language: Some("en-US".into()),
+            update_fields: Some(true),
+            auto_hyphenation: None,
+        }))
+        .await;
+    assert_eq!(json(&r)["updated"], true);
+
+    // content control (Phase 2)
+    let r = srv
+        .add_content_control(Parameters(ContentControlInput {
+            document_handle: handle.clone(),
+            kind: "checkbox".into(),
+            tag: "agree".into(),
+            placeholder: None,
+            options: None,
+            date_format: None,
+            checked: Some(true),
+        }))
+        .await;
+    assert_eq!(json(&r)["added"], true);
+
+    // equation (Phase 3)
+    let r = srv
+        .add_equation(Parameters(EquationInput {
+            document_handle: handle.clone(),
+            latex: r"\frac{a}{b}".into(),
+        }))
+        .await;
+    assert_eq!(json(&r)["added"], true);
+
+    // shape (Phase 4)
+    let r = srv
+        .add_shape(Parameters(ShapeInput {
+            document_handle: handle.clone(),
+            geometry: "ellipse".into(),
+            width_inches: Some(2.0),
+            height_inches: Some(2.0),
+            fill_color: Some("FFCC00".into()),
+        }))
+        .await;
+    assert_eq!(json(&r)["added"], true);
+
+    // chart incl. scatter (Phase 5 + gap fix)
+    let r = srv
+        .add_chart(Parameters(ChartInput {
+            document_handle: handle.clone(),
+            kind: "scatter".into(),
+            categories: vec!["1".into(), "2".into()],
+            series: vec![ChartSeriesInput { name: "s".into(), values: vec![3.0, 6.0] }],
+            title: Some("XY".into()),
+            width_inches: None,
+            height_inches: None,
+            label_position: None,
+            label_show_value: None,
+            label_show_category: None,
+            label_show_percent: None,
+            label_color: None,
+        }))
+        .await;
+    assert_eq!(json(&r)["added"], true);
+
+    // threaded comments (Phase 6)
+    srv.add_comment(Parameters(CommentInput {
+        document_handle: handle.clone(),
+        id: 1,
+        author: "A".into(),
+        text: "q".into(),
+    }))
+    .await;
+    let r = srv
+        .reply_to_comment(Parameters(CommentReplyInput {
+            document_handle: handle.clone(),
+            id: 2,
+            parent_id: 1,
+            author: "B".into(),
+            text: "a".into(),
+        }))
+        .await;
+    assert_eq!(json(&r)["added"], true);
+
+    // save and reopen — proves the assembled document is structurally valid
+    let out = std::env::temp_dir().join("mcp_integration_test.docx");
+    let out_s = out.to_string_lossy().to_string();
+    let r = srv
+        .save_document(Parameters(SaveInput {
+            document_handle: handle.clone(),
+            output_path: out_s.clone(),
+        }))
+        .await;
+    assert!(json(&r)["saved"].is_string(), "save failed: {r}");
+
+    let r = srv.open_document(Parameters(OpenInput { file_path: out_s })).await;
+    assert!(json(&r)["handle"].is_string(), "reopen failed: {r}");
+
+    let _ = std::fs::remove_file(&out);
+}
+
+#[tokio::test]
+async fn unknown_chart_kind_is_rejected() {
+    let srv = DocxServer::new();
+    let h = json(&srv.create_document(Parameters(CreateInput { title: None, format: None })).await)
+        ["handle"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    let r = srv
+        .add_chart(Parameters(ChartInput {
+            document_handle: h,
+            kind: "bogus".into(),
+            categories: vec![],
+            series: vec![],
+            title: None,
+            width_inches: None,
+            height_inches: None,
+            label_position: None,
+            label_show_value: None,
+            label_show_category: None,
+            label_show_percent: None,
+            label_color: None,
+        }))
+        .await;
+    assert!(json(&r)["error"].is_string(), "expected error for bogus kind: {r}");
+}
