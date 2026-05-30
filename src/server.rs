@@ -96,6 +96,22 @@ pub struct ImageInput {
     pub width: Option<f64>,
     /// Height in inches
     pub height: Option<f64>,
+    /// Clockwise rotation in degrees
+    pub rotation: Option<f64>,
+    /// Flip horizontally
+    pub flip_h: Option<bool>,
+    /// Flip vertically
+    pub flip_v: Option<bool>,
+    /// Crop percentages [left, top, right, bottom] (e.g. 10 = crop 10%)
+    pub crop: Option<[f64; 4]>,
+    /// Border color hex (e.g. "000000")
+    pub border_color: Option<String>,
+    /// Border width in points (default 1.0 when border_color set)
+    pub border_width: Option<f64>,
+    /// Drop shadow color hex (e.g. "808080")
+    pub shadow_color: Option<String>,
+    /// Accessibility alt-text title
+    pub alt_text: Option<String>,
 }
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
@@ -604,7 +620,28 @@ impl DocxServer {
             let filename = format!("image.{}", ext);
             let w = zavora_docx::Length::inches(input.width.unwrap_or(4.0));
             let h = zavora_docx::Length::inches(input.height.unwrap_or(3.0));
-            doc.add_picture(&img_data, &filename, w, h);
+            let has_feature = input.rotation.is_some() || input.flip_h.is_some()
+                || input.flip_v.is_some() || input.crop.is_some()
+                || input.border_color.is_some() || input.shadow_color.is_some()
+                || input.alt_text.is_some();
+            if has_feature {
+                let props = zavora_docx::PicProps {
+                    rotation: input.rotation.map(|d| (d * 60_000.0) as i32),
+                    flip_h: input.flip_h.unwrap_or(false),
+                    flip_v: input.flip_v.unwrap_or(false),
+                    crop: input.crop.map(|c| [
+                        (c[0] * 1000.0) as i32, (c[1] * 1000.0) as i32,
+                        (c[2] * 1000.0) as i32, (c[3] * 1000.0) as i32,
+                    ]),
+                    border: input.border_color.map(|c|
+                        (c, (input.border_width.unwrap_or(1.0) * 12700.0) as i64)),
+                    shadow: input.shadow_color,
+                    title: input.alt_text,
+                };
+                doc.add_picture_with(&img_data, &filename, w, h, props);
+            } else {
+                doc.add_picture(&img_data, &filename, w, h);
+            }
             serde_json::json!({"added": true}).to_string()
         })
     }
