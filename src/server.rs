@@ -336,7 +336,7 @@ pub struct DeleteInput { pub document_handle: String, pub index: usize }
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
 pub struct UpdateParaInput { pub document_handle: String, pub index: usize, pub text: String }
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
-pub struct RunSpec { pub text: String, pub bold: Option<bool>, pub italic: Option<bool>, pub underline: Option<bool> }
+pub struct RunSpec { pub text: String, pub bold: Option<bool>, pub italic: Option<bool>, pub underline: Option<bool>, pub color: Option<String> }
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
 pub struct ParaRunsInput { pub document_handle: String, pub index: usize, pub runs: Vec<RunSpec> }
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
@@ -1187,6 +1187,7 @@ impl DocxServer {
                 if r.bold.unwrap_or(false) { run = run.bold(true); }
                 if r.italic.unwrap_or(false) { run = run.italic(true); }
                 if r.underline.unwrap_or(false) { run = run.underline(true); }
+                if let Some(ref c) = r.color { run = run.color(c.trim_start_matches('#')); }
                 let _ = run;
             }
             serde_json::json!({"updated": true, "index": input.index, "runs": input.runs.len()}).to_string()
