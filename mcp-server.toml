@@ -221,6 +221,13 @@ requires_approval = false
 credential_bindings = []
 
 [[tools]]
+name = "image_bytes"
+description = "Raw bytes (base64) of an embedded image by embed id, for the WYSIWYG renderer."
+risk_class = "read_only"
+requires_approval = false
+credential_bindings = []
+
+[[tools]]
 name = "save_pdf"
 description = "Export document as PDF. Saves to the given file path."
 risk_class = "local_write"

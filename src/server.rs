@@ -319,6 +319,9 @@ pub struct HeaderFooterInput {
 pub struct ExportInput { pub document_handle: String }
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct ImageBytesInput { pub document_handle: String, pub embed_id: String }
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
 pub struct SavePdfInput { pub document_handle: String, pub output_path: String }
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
@@ -1099,6 +1102,20 @@ impl DocxServer {
             match doc.layout_json() {
                 Ok(json) => json,
                 Err(e) => serde_json::json!({"error": e.to_string()}).to_string(),
+            }
+        })
+    }
+
+    #[tool(description = "Raw bytes of an embedded image by its embed/relationship id (the embed_id carried by layout_frames Image elements). Returns {content_type, base64}. Used to display images in the WYSIWYG renderer.")]
+    pub async fn image_bytes(&self, Parameters(input): Parameters<ImageBytesInput>) -> String {
+        use base64::Engine;
+        with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
+            match doc.image_by_embed_id(&input.embed_id) {
+                Some((bytes, ct)) => serde_json::json!({
+                    "content_type": ct,
+                    "base64": base64::engine::general_purpose::STANDARD.encode(&bytes),
+                }).to_string(),
+                None => serde_json::json!({"error": "image not found"}).to_string(),
             }
         })
     }
