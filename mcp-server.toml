@@ -284,6 +284,13 @@ requires_approval = false
 credential_bindings = []
 
 [[tools]]
+name = "set_paragraph_style"
+description = "Change an existing paragraph's named style by index (Heading1/2/3, Title, Subtitle, Normal), preserving its text."
+risk_class = "local_write"
+requires_approval = false
+credential_bindings = []
+
+[[tools]]
 name = "add_list"
 description = "Create a bulleted or numbered list. list_type: 'bullet' or 'numbered'."
 risk_class = "local_write"

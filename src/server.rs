@@ -343,6 +343,8 @@ pub struct FieldInput { pub document_handle: String, pub paragraph_index: usize,
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
 pub struct ParaFormatInput { pub document_handle: String, pub index: usize, pub alignment: Option<String>, pub space_before: Option<f64>, pub space_after: Option<f64>, pub line_spacing: Option<f64> }
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct ParaStyleInput { pub document_handle: String, pub index: usize, pub style: String }
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
 pub struct ListInput { pub document_handle: String, pub items: Vec<String>, pub list_type: Option<String>, pub index: Option<usize> }
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
 pub struct TableWithDataInput { pub document_handle: String, pub index: usize, pub headers: Vec<String>, pub rows: Vec<Vec<String>> }
@@ -1197,7 +1199,17 @@ impl DocxServer {
         })
     }
 
-    #[tool(description = "Set paragraph formatting: alignment (left, center, right, justify), spacing, line spacing.")]
+    #[tool(description = "Change an existing paragraph's named style by index (e.g. Heading1, Heading2, Heading3, Title, Subtitle, Normal). Preserves the paragraph's text.")]
+    pub async fn set_paragraph_style(&self, Parameters(input): Parameters<ParaStyleInput>) -> String {
+        with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
+            match doc.paragraph_mut(input.index) {
+                Some(para) => { para.style(&input.style); serde_json::json!({"styled": true, "index": input.index}).to_string() }
+                None => serde_json::json!({"error": "INDEX_OUT_OF_BOUNDS"}).to_string(),
+            }
+        })
+    }
+
+    #[tool(description = "Set paragraph-level formatting (alignment, spacing) by index.")]
     pub async fn set_paragraph_format(&self, Parameters(input): Parameters<ParaFormatInput>) -> String {
         with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
             match doc.paragraph_mut(input.index) {
