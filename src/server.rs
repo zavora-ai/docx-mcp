@@ -1093,6 +1093,16 @@ impl DocxServer {
         })
     }
 
+    #[tool(description = "Engine-authoritative layout: the positioned page frames (glyph runs, lines, rects, images) as laid out by the SAME engine that produces the PDF — true WYSIWYG. Returns {pages:[{page_number,width,height,elements:[...]}]} in typographic points. Render these directly instead of measuring in the browser.")]
+    pub async fn layout_frames(&self, Parameters(input): Parameters<ExportInput>) -> String {
+        with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
+            match doc.layout_json() {
+                Ok(pages) => format!("{{\"pages\":{pages}}}"),
+                Err(e) => serde_json::json!({"error": e.to_string()}).to_string(),
+            }
+        })
+    }
+
     #[tool(description = "Export document as PDF. Saves to the given file path.")]
     pub async fn save_pdf(&self, Parameters(input): Parameters<SavePdfInput>) -> String {
         with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
