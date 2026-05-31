@@ -311,6 +311,8 @@ pub fn create_kdp_manga(doc: &mut Document) {
 
 /// US Letter page + a clean corporate theme. `accent` is the heading/brand hex.
 fn business_base(doc: &mut Document, f: &Fields, title: &str, accent: &str, heading_font: &str, body_font: &str) {
+    let heading_font = f.get("heading_font", heading_font);
+    let body_font = f.get("body_font", body_font);
     doc.set_page_size(Length::inches(8.5), Length::inches(11.0));
     doc.set_margins(Length::inches(1.0), Length::inches(1.0), Length::inches(1.0), Length::inches(1.0));
     doc.set_title(title);
@@ -319,10 +321,10 @@ fn business_base(doc: &mut Document, f: &Fields, title: &str, accent: &str, head
           ("accent1",accent),("accent2","C0392B"),("accent3","27AE60"),
           ("accent4","F39C12"),("accent5","8E44AD"),("accent6","16A085"),
           ("hlink",accent),("folHlink","8E44AD")],
-        heading_font, body_font,
+        &heading_font, &body_font,
     );
     apply_book_styles(doc, &BookStyle {
-        body_font, heading_font,
+        body_font: &body_font, heading_font: &heading_font,
         body_pt: 11.0, line_spacing: 1.15, justified: false, heading_color: accent,
     });
     render_logo(doc, f);
@@ -446,14 +448,20 @@ fn load_logo(path: &str) -> Option<(Vec<u8>, String, f64)> {
     Some((data, format!("logo.{ext}"), w as f64 / h as f64))
 }
 
-/// Render an optional centered logo from `f["logo"]` (image file path), scaled
-/// to ~0.6" tall preserving aspect ratio. No-op when absent/unreadable, so
-/// every template can accept a logo at zero cost when none is supplied.
+/// Render an optional logo from `f["logo"]` (image file path), scaled to
+/// `f["logo_height"]` inches tall (default 0.6) preserving aspect ratio and
+/// aligned per `f["logo_align"]` (left|center|right, default center). No-op
+/// when absent/unreadable, so every template accepts a logo at zero cost.
 fn render_logo(doc: &mut Document, f: &Fields) {
     if let Some((data, name, aspect)) = load_logo(&f.get("logo", "")) {
-        let h = 0.6_f64;
+        let h = f.get("logo_height", "0.6").parse::<f64>().unwrap_or(0.6).clamp(0.2, 3.0);
+        let align = match f.get("logo_align", "center").as_str() {
+            "left" => Alignment::Left,
+            "right" => Alignment::Right,
+            _ => Alignment::Center,
+        };
         doc.add_picture(&data, &name, Length::inches(h * aspect), Length::inches(h))
-            .alignment(Alignment::Center);
+            .alignment(align);
     }
 }
 
@@ -1101,6 +1109,22 @@ pub fn create_business_plan(doc: &mut Document, f: &Fields) {
         section_rule(doc, h, &accent);
         doc.add_paragraph(&f.get(key, dflt));
     }
+}
+
+/// Universal styling parameters every business template accepts, as structured
+/// metadata (name, type, default, allowed values, note) so callers can discover
+/// them programmatically rather than parsing prose. Applied in business_base /
+/// render_logo, so this list and the behavior share one origin.
+pub fn style_params() -> Vec<(&'static str, &'static str, &'static str, &'static str)> {
+    vec![
+        // (name, type, default, note)
+        ("accent", "hex color", "per-template", "6-digit hex brand color, optional leading '#'; re-themes title, headings, and table bands"),
+        ("logo", "image path", "(none)", "PNG/JPEG file rendered as a masthead above the title"),
+        ("logo_align", "left|center|right", "center", "horizontal placement of the logo"),
+        ("logo_height", "inches", "0.6", "logo height; width scales to preserve aspect ratio (0.2–3.0)"),
+        ("heading_font", "font name", "per-template", "overrides the heading/title font family"),
+        ("body_font", "font name", "per-template", "overrides the body text font family"),
+    ]
 }
 
 /// Catalog of business template formats: (format id, description, accepted

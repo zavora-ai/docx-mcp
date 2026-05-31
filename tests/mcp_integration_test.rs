@@ -254,6 +254,11 @@ async fn list_templates_returns_catalog() {
     let v = json(&r);
     let templates = v["templates"].as_array().expect("templates array");
     assert_eq!(templates.len(), 21, "expected 21 business templates");
+    let params = v["style_params"].as_array().expect("style_params array");
+    let names: Vec<&str> = params.iter().map(|p| p["name"].as_str().unwrap()).collect();
+    for k in ["accent", "logo", "logo_align", "logo_height", "heading_font", "body_font"] {
+        assert!(names.contains(&k), "style_params missing {k}: {names:?}");
+    }
     // Every entry must carry a format, description, and data_keys.
     for t in templates {
         assert!(t["format"].as_str().is_some_and(|s| s.starts_with("business:")), "bad format: {t}");

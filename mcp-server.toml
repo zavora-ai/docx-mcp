@@ -19,7 +19,7 @@ credential_bindings = []
 
 [[tools]]
 name = "list_templates"
-description = "List business document templates available to create_document. Returns each format id, a description, and the accepted 'data' keys (with ..."
+description = "List business document templates for create_document. Returns 'templates' (each: format id, description, accepted per-format 'data' keys ..."
 risk_class = "read_only"
 requires_approval = false
 credential_bindings = []

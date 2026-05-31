@@ -635,14 +635,19 @@ impl DocxServer {
         serde_json::json!({"handle": handle}).to_string()
     }
 
-    #[tool(description = "List business document templates available to create_document. Returns each format id, a description, and the accepted 'data' keys (with [] marking array fields and {} their item shape). Every template also accepts an optional 'accent' (6-digit hex brand color) and 'logo' (image file path, rendered as a centered masthead).")]
+    #[tool(description = "List business document templates for create_document. Returns 'templates' (each: format id, description, accepted per-format 'data' keys — [] marks arrays, {} their item shape) and 'style_params' (universal styling keys every template accepts: name, type, default, and note).")]
     pub async fn list_templates(&self) -> String {
         let templates: Vec<serde_json::Value> = engine::template_catalog().into_iter()
             .map(|(format, description, data_keys)| serde_json::json!({
                 "format": format, "description": description, "data_keys": data_keys,
             }))
             .collect();
-        serde_json::json!({"templates": templates}).to_string()
+        let style_params: Vec<serde_json::Value> = engine::style_params().into_iter()
+            .map(|(name, ty, default, note)| serde_json::json!({
+                "name": name, "type": ty, "default": default, "note": note,
+            }))
+            .collect();
+        serde_json::json!({"templates": templates, "style_params": style_params}).to_string()
     }
 
     #[tool(description = "Create a professionally-styled novel with author-specific settings (trim size, font, spacing). Sets justified body text, widow control, chapter-opener heading style, and a running header. Use insert_paragraph with style=Heading1 for chapter titles (drives the TOC), TitlePage/Subtitle/Author for the title page, and BodyText/BodyTextIndent for prose.")]
