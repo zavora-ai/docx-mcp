@@ -1097,7 +1097,7 @@ impl DocxServer {
     pub async fn layout_frames(&self, Parameters(input): Parameters<ExportInput>) -> String {
         with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
             match doc.layout_json() {
-                Ok(pages) => format!("{{\"pages\":{pages}}}"),
+                Ok(json) => json,
                 Err(e) => serde_json::json!({"error": e.to_string()}).to_string(),
             }
         })
