@@ -200,6 +200,13 @@ requires_approval = false
 credential_bindings = []
 
 [[tools]]
+name = "editable_html"
+description = "Export document as an editable HTML fragment with data-p node indices for an in-place editing view."
+risk_class = "read_only"
+requires_approval = false
+credential_bindings = []
+
+[[tools]]
 name = "save_pdf"
 description = "Export document as PDF. Saves to the given file path."
 risk_class = "local_write"

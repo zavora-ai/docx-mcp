@@ -1067,6 +1067,13 @@ impl DocxServer {
         })
     }
 
+    #[tool(description = "Export document as an editable HTML fragment. Each block carries data-p=\"{index}\" mapping to the paragraph index for update_paragraph_text. Use for an in-place editing view.")]
+    pub async fn editable_html(&self, Parameters(input): Parameters<ExportInput>) -> String {
+        with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
+            serde_json::json!({"html": doc.to_editable_html()}).to_string()
+        })
+    }
+
     #[tool(description = "Export document as PDF. Saves to the given file path.")]
     pub async fn save_pdf(&self, Parameters(input): Parameters<SavePdfInput>) -> String {
         with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
