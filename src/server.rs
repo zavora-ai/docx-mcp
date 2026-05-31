@@ -635,7 +635,7 @@ impl DocxServer {
         serde_json::json!({"handle": handle}).to_string()
     }
 
-    #[tool(description = "List business document templates available to create_document. Returns each format id, a description, and the accepted 'data' keys (with [] marking array fields and {} their item shape).")]
+    #[tool(description = "List business document templates available to create_document. Returns each format id, a description, and the accepted 'data' keys (with [] marking array fields and {} their item shape). Every template also accepts an optional 'logo' (image file path) rendered as a centered masthead.")]
     pub async fn list_templates(&self) -> String {
         let templates: Vec<serde_json::Value> = engine::template_catalog().into_iter()
             .map(|(format, description, data_keys)| serde_json::json!({

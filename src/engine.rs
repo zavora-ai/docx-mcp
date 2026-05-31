@@ -310,7 +310,7 @@ pub fn create_kdp_manga(doc: &mut Document) {
 // ── Business / professional templates ────────────────────────────────────────
 
 /// US Letter page + a clean corporate theme. `accent` is the heading/brand hex.
-fn business_base(doc: &mut Document, title: &str, accent: &str, heading_font: &str, body_font: &str) {
+fn business_base(doc: &mut Document, f: &Fields, title: &str, accent: &str, heading_font: &str, body_font: &str) {
     doc.set_page_size(Length::inches(8.5), Length::inches(11.0));
     doc.set_margins(Length::inches(1.0), Length::inches(1.0), Length::inches(1.0), Length::inches(1.0));
     doc.set_title(title);
@@ -325,6 +325,7 @@ fn business_base(doc: &mut Document, title: &str, accent: &str, heading_font: &s
         body_font, heading_font,
         body_pt: 11.0, line_spacing: 1.15, justified: false, heading_color: accent,
     });
+    render_logo(doc, f);
 }
 
 /// Heading-style helper: a paragraph in Heading{level} style.
@@ -402,6 +403,51 @@ fn fmt_qty(q: f64) -> String {
     if q.fract() == 0.0 { format!("{}", q as i64) } else { format!("{}", q) }
 }
 
+/// Read pixel dimensions from PNG or JPEG header bytes (no image crate dep).
+fn image_dims(data: &[u8]) -> Option<(u32, u32)> {
+    if data.len() > 24 && &data[0..8] == b"\x89PNG\r\n\x1a\n" {
+        let w = u32::from_be_bytes([data[16], data[17], data[18], data[19]]);
+        let h = u32::from_be_bytes([data[20], data[21], data[22], data[23]]);
+        return Some((w, h));
+    }
+    if data.len() > 4 && data[0] == 0xFF && data[1] == 0xD8 {
+        let mut i = 2;
+        while i + 9 < data.len() {
+            if data[i] != 0xFF { i += 1; continue; }
+            let m = data[i + 1];
+            if (0xC0..=0xCF).contains(&m) && m != 0xC4 && m != 0xC8 && m != 0xCC {
+                let h = u16::from_be_bytes([data[i + 5], data[i + 6]]) as u32;
+                let w = u16::from_be_bytes([data[i + 7], data[i + 8]]) as u32;
+                return Some((w, h));
+            }
+            i += 2 + u16::from_be_bytes([data[i + 2], data[i + 3]]) as usize;
+        }
+    }
+    None
+}
+
+/// Read a logo image file and return (bytes, filename, aspect = w/h). None if
+/// the path is empty or unreadable / not a recognized image.
+fn load_logo(path: &str) -> Option<(Vec<u8>, String, f64)> {
+    if path.is_empty() { return None; }
+    let data = std::fs::read(path).ok()?;
+    let (w, h) = image_dims(&data)?;
+    if h == 0 { return None; }
+    let ext = path.rsplit('.').next().unwrap_or("png");
+    Some((data, format!("logo.{ext}"), w as f64 / h as f64))
+}
+
+/// Render an optional centered logo from `f["logo"]` (image file path), scaled
+/// to ~0.6" tall preserving aspect ratio. No-op when absent/unreadable, so
+/// every template can accept a logo at zero cost when none is supplied.
+fn render_logo(doc: &mut Document, f: &Fields) {
+    if let Some((data, name, aspect)) = load_logo(&f.get("logo", "")) {
+        let h = 0.6_f64;
+        doc.add_picture(&data, &name, Length::inches(h * aspect), Length::inches(h))
+            .alignment(Alignment::Center);
+    }
+}
+
 /// A bordered Description/Qty/Unit Price/Amount table with an auto-summed
 /// total row (`total_label` names it, e.g. "TOTAL" or "PAID"). Reused by
 /// invoice-like documents (quote, purchase order, receipt).
@@ -448,7 +494,7 @@ fn priced_items_table(doc: &mut Document, f: &Fields, accent: &str, total_label:
 
 /// Business report: title page-style header, sections scaffold, page numbers.
 pub fn create_business_report(doc: &mut Document, f: &Fields) {
-    business_base(doc, "Business Report", "2980B9", "Calibri", "Cambria");
+    business_base(doc, f, "Business Report", "2980B9", "Calibri", "Cambria");
     doc.set_footer_page_number();
     doc.add_paragraph(&f.get("title", "BUSINESS REPORT").to_uppercase()).style("Heading1").alignment(Alignment::Center);
     doc.add_paragraph(&f.get("subtitle", "Subtitle / Reporting Period")).alignment(Alignment::Center);
@@ -471,7 +517,7 @@ pub fn create_business_report(doc: &mut Document, f: &Fields) {
 /// and proper bulleted accomplishments.
 pub fn create_resume(doc: &mut Document, f: &Fields) {
     let accent = "1F3A5F";
-    business_base(doc, "Resume", accent, "Calibri", "Calibri");
+    business_base(doc, f, "Resume", accent, "Calibri", "Calibri");
     doc.set_margins(Length::inches(0.75), Length::inches(0.75), Length::inches(0.75), Length::inches(0.75));
     let edge = 7.0; // 8.5" - 2×0.75" printable width
 
@@ -518,7 +564,7 @@ pub fn create_resume(doc: &mut Document, f: &Fields) {
 
 /// Business letter: block format with sender/recipient/date/salutation/body/closing.
 pub fn create_letter(doc: &mut Document, f: &Fields) {
-    business_base(doc, "Letter", "1A1A1A", "Cambria", "Cambria");
+    business_base(doc, f, "Letter", "1A1A1A", "Cambria", "Cambria");
     doc.add_paragraph(&f.get("sender_name", "[Your Name]"));
     doc.add_paragraph(&f.get("sender_address", "[Street Address]"));
     doc.add_paragraph(&f.get("sender_city", "[City, State ZIP]"));
@@ -543,7 +589,7 @@ pub fn create_letter(doc: &mut Document, f: &Fields) {
 /// Memo: ruled MEMORANDUM header + sized TO/FROM/DATE/RE block + body.
 pub fn create_memo(doc: &mut Document, f: &Fields) {
     let accent = "404040";
-    business_base(doc, "Memo", accent, "Calibri", "Calibri");
+    business_base(doc, f, "Memo", accent, "Calibri", "Calibri");
     section_rule(doc, "Memorandum", accent);
     let mut t = doc.add_table(4, 2)
         .column_widths(&[Length::inches(1.0), Length::inches(5.5)]);
@@ -567,7 +613,7 @@ pub fn create_memo(doc: &mut Document, f: &Fields) {
 /// with right-aligned currency, and an emphasized total row.
 pub fn create_invoice(doc: &mut Document, f: &Fields) {
     let accent = "1F6F54";
-    business_base(doc, "Invoice", accent, "Calibri", "Calibri");
+    business_base(doc, f, "Invoice", accent, "Calibri", "Calibri");
 
     // Masthead: company on the left, big INVOICE wordmark established by Heading1.
     {
@@ -608,7 +654,7 @@ pub fn create_invoice(doc: &mut Document, f: &Fields) {
 /// Newsletter: ruled masthead + two-column body with ruled article headings.
 pub fn create_newsletter(doc: &mut Document, f: &Fields) {
     let accent = "6C3483";
-    business_base(doc, "Newsletter", accent, "Calibri", "Georgia");
+    business_base(doc, f, "Newsletter", accent, "Calibri", "Georgia");
     doc.add_paragraph(&f.get("title", "THE NEWSLETTER").to_uppercase()).style("Heading1").alignment(Alignment::Center);
     {
         use zavora_docx::BorderStyle;
@@ -629,7 +675,7 @@ pub fn create_newsletter(doc: &mut Document, f: &Fields) {
 
 /// Academic paper: title block, abstract, numbered sections, references.
 pub fn create_academic(doc: &mut Document, f: &Fields) {
-    business_base(doc, "Academic Paper", "1A1A1A", "Times New Roman", "Times New Roman");
+    business_base(doc, f, "Academic Paper", "1A1A1A", "Times New Roman", "Times New Roman");
     apply_book_styles(doc, &BookStyle {
         body_font: "Times New Roman", heading_font: "Times New Roman",
         body_pt: 12.0, line_spacing: 2.0, justified: false, heading_color: "1A1A1A",
@@ -658,7 +704,7 @@ pub fn create_academic(doc: &mut Document, f: &Fields) {
 pub fn create_proposal(doc: &mut Document, f: &Fields) {
     use zavora_docx::BorderStyle;
     let accent = "B9770E";
-    business_base(doc, "Proposal", accent, "Calibri", "Cambria");
+    business_base(doc, f, "Proposal", accent, "Calibri", "Cambria");
     doc.set_footer_page_number();
     doc.add_paragraph(&f.get("title", "PROJECT PROPOSAL").to_uppercase()).style("Heading1").alignment(Alignment::Center);
     doc.add_paragraph(&format!("Prepared for {} · by {}", f.get("client", "[Client]"), f.get("author", "[Your Company]"))).alignment(Alignment::Center);
@@ -711,7 +757,7 @@ pub fn create_proposal(doc: &mut Document, f: &Fields) {
 /// Meeting agenda: meta block + ruled item list with right-aligned durations.
 pub fn create_agenda(doc: &mut Document, f: &Fields) {
     let accent = "2C3E50";
-    business_base(doc, "Agenda", accent, "Calibri", "Calibri");
+    business_base(doc, f, "Agenda", accent, "Calibri", "Calibri");
     doc.set_margins(Length::inches(0.75), Length::inches(0.75), Length::inches(0.75), Length::inches(0.75));
     let edge = 7.0;
     doc.add_paragraph(&f.get("title", "MEETING AGENDA").to_uppercase()).style("Heading1").alignment(Alignment::Center);
@@ -744,7 +790,7 @@ pub fn create_agenda(doc: &mut Document, f: &Fields) {
 /// boilerplate, and an end marker.
 pub fn create_press_release(doc: &mut Document, f: &Fields) {
     let accent = "1A1A1A";
-    business_base(doc, "Press Release", accent, "Arial", "Georgia");
+    business_base(doc, f, "Press Release", accent, "Arial", "Georgia");
     {
         let mut p = doc.add_paragraph("");
         p.add_run(&f.get("status", "FOR IMMEDIATE RELEASE")).bold(true).all_caps(true).color(accent);
@@ -778,7 +824,7 @@ pub fn create_press_release(doc: &mut Document, f: &Fields) {
 pub fn create_certificate(doc: &mut Document, f: &Fields) {
     use zavora_docx::BorderStyle;
     let accent = "8A6D1F";
-    business_base(doc, "Certificate", accent, "Georgia", "Georgia");
+    business_base(doc, f, "Certificate", accent, "Georgia", "Georgia");
     doc.set_landscape();
     for _ in 0..2 { doc.add_paragraph(""); }
     doc.add_paragraph(&f.get("title", "Certificate of Achievement")).style("Heading1").alignment(Alignment::Center);
@@ -809,7 +855,7 @@ pub fn create_certificate(doc: &mut Document, f: &Fields) {
 
 /// Cover letter: sender/recipient block, salutation, persuasive body, closing.
 pub fn create_cover_letter(doc: &mut Document, f: &Fields) {
-    business_base(doc, "Cover Letter", "1A1A1A", "Cambria", "Cambria");
+    business_base(doc, f, "Cover Letter", "1A1A1A", "Cambria", "Cambria");
     doc.add_paragraph(&f.get("name", "[Your Name]"));
     doc.add_paragraph(&f.get("contact", "[email · phone · city]"));
     doc.add_paragraph("");
@@ -832,7 +878,7 @@ pub fn create_cover_letter(doc: &mut Document, f: &Fields) {
 /// Fax cover sheet: ruled header + labeled routing table + note.
 pub fn create_fax_cover(doc: &mut Document, f: &Fields) {
     let accent = "404040";
-    business_base(doc, "Fax", accent, "Calibri", "Calibri");
+    business_base(doc, f, "Fax", accent, "Calibri", "Calibri");
     section_rule(doc, "Fax", accent);
     let mut t = doc.add_table(6, 2)
         .column_widths(&[Length::inches(1.2), Length::inches(5.3)]);
@@ -852,7 +898,7 @@ pub fn create_fax_cover(doc: &mut Document, f: &Fields) {
 /// Price quote: company/meta/bill-to + priced items with a quoted TOTAL.
 pub fn create_quote(doc: &mut Document, f: &Fields) {
     let accent = "2471A3";
-    business_base(doc, "Quote", accent, "Calibri", "Calibri");
+    business_base(doc, f, "Quote", accent, "Calibri", "Calibri");
     {
         let mut p = doc.add_paragraph("");
         p.add_run(&f.get("company", "[Your Company]")).bold(true).size(15.0).color(accent);
@@ -879,7 +925,7 @@ pub fn create_quote(doc: &mut Document, f: &Fields) {
 /// Purchase order: vendor/ship-to blocks + priced items with a PO total.
 pub fn create_purchase_order(doc: &mut Document, f: &Fields) {
     let accent = "1F6F54";
-    business_base(doc, "Purchase Order", accent, "Calibri", "Calibri");
+    business_base(doc, f, "Purchase Order", accent, "Calibri", "Calibri");
     {
         let mut p = doc.add_paragraph("");
         p.add_run(&f.get("company", "[Your Company]")).bold(true).size(15.0).color(accent);
@@ -907,7 +953,7 @@ pub fn create_purchase_order(doc: &mut Document, f: &Fields) {
 /// Payment receipt: receipt meta + priced items showing amount PAID.
 pub fn create_receipt(doc: &mut Document, f: &Fields) {
     let accent = "117864";
-    business_base(doc, "Receipt", accent, "Calibri", "Calibri");
+    business_base(doc, f, "Receipt", accent, "Calibri", "Calibri");
     {
         let mut p = doc.add_paragraph("");
         p.add_run(&f.get("company", "[Your Company]")).bold(true).size(15.0).color(accent);
@@ -933,7 +979,7 @@ pub fn create_receipt(doc: &mut Document, f: &Fields) {
 /// Event flyer: large centered headline, subhead, ruled details, and call-out.
 pub fn create_flyer(doc: &mut Document, f: &Fields) {
     let accent = "C0392B";
-    business_base(doc, "Flyer", accent, "Arial", "Arial");
+    business_base(doc, f, "Flyer", accent, "Arial", "Arial");
     for _ in 0..2 { doc.add_paragraph(""); }
     doc.add_paragraph(&f.get("headline", "EVENT TITLE").to_uppercase()).style("Heading1").alignment(Alignment::Center);
     { let mut p = doc.add_paragraph("").alignment(Alignment::Center); p.add_run(&f.get("subhead", "[Catchy one-liner]")).italic(true).size(15.0); }
@@ -950,7 +996,7 @@ pub fn create_flyer(doc: &mut Document, f: &Fields) {
 /// Contract / agreement: title, parties, numbered clauses, signature blocks.
 pub fn create_contract(doc: &mut Document, f: &Fields) {
     let accent = "1A1A1A";
-    business_base(doc, "Agreement", accent, "Times New Roman", "Times New Roman");
+    business_base(doc, f, "Agreement", accent, "Times New Roman", "Times New Roman");
     doc.set_footer_page_number();
     doc.add_paragraph(&f.get("title", "SERVICE AGREEMENT").to_uppercase()).style("Heading1").alignment(Alignment::Center);
     doc.add_paragraph(&format!("This agreement is made on {} between {} (\"Provider\") and {} (\"Client\").",
@@ -983,7 +1029,7 @@ pub fn create_contract(doc: &mut Document, f: &Fields) {
 /// Meeting minutes: meta block, attendees, ruled discussion, and action items.
 pub fn create_meeting_minutes(doc: &mut Document, f: &Fields) {
     let accent = "2C3E50";
-    business_base(doc, "Minutes", accent, "Calibri", "Calibri");
+    business_base(doc, f, "Minutes", accent, "Calibri", "Calibri");
     doc.add_paragraph(&f.get("title", "MEETING MINUTES").to_uppercase()).style("Heading1").alignment(Alignment::Center);
     let mut t = doc.add_table(3, 2).column_widths(&[Length::inches(1.2), Length::inches(5.3)]);
     let meta = [("Date", f.get("date", "[Date]")), ("Time", f.get("time", "[Time]")), ("Location", f.get("location", "[Location]"))];
@@ -1009,7 +1055,7 @@ pub fn create_meeting_minutes(doc: &mut Document, f: &Fields) {
 pub fn create_sign_in_sheet(doc: &mut Document, f: &Fields) {
     use zavora_docx::BorderStyle;
     let accent = "34495E";
-    business_base(doc, "Sign-In Sheet", accent, "Calibri", "Calibri");
+    business_base(doc, f, "Sign-In Sheet", accent, "Calibri", "Calibri");
     doc.add_paragraph(&f.get("title", "SIGN-IN SHEET").to_uppercase()).style("Heading1").alignment(Alignment::Center);
     doc.add_paragraph(&format!("{} · {}", f.get("event", "[Event]"), f.get("date", "[Date]"))).alignment(Alignment::Center);
     doc.add_paragraph("");
@@ -1026,7 +1072,7 @@ pub fn create_sign_in_sheet(doc: &mut Document, f: &Fields) {
 /// Business plan: title page-style header, page numbers, standard sections.
 pub fn create_business_plan(doc: &mut Document, f: &Fields) {
     let accent = "6C3483";
-    business_base(doc, "Business Plan", accent, "Calibri", "Cambria");
+    business_base(doc, f, "Business Plan", accent, "Calibri", "Cambria");
     doc.set_footer_page_number();
     doc.add_paragraph(&f.get("company", "COMPANY NAME").to_uppercase()).style("Heading1").alignment(Alignment::Center);
     doc.add_paragraph(&f.get("tagline", "Business Plan")).alignment(Alignment::Center);
@@ -1265,5 +1311,40 @@ pub fn insert_chapter_opening(doc: &mut Document, index: usize, text: &str, font
     }
     if !tail.is_empty() {
         body.add_run(&tail).font(font);
+    }
+}
+
+#[cfg(test)]
+mod logo_tests {
+    use super::{image_dims, load_logo};
+
+    #[test]
+    fn parses_png_dimensions() {
+        // PNG signature + IHDR with width=180, height=80.
+        let mut d = b"\x89PNG\r\n\x1a\n".to_vec();
+        d.extend_from_slice(&[0, 0, 0, 13]); // IHDR length
+        d.extend_from_slice(b"IHDR");
+        d.extend_from_slice(&180u32.to_be_bytes());
+        d.extend_from_slice(&80u32.to_be_bytes());
+        d.extend_from_slice(&[8, 2, 0, 0, 0]);
+        assert_eq!(image_dims(&d), Some((180, 80)));
+    }
+
+    #[test]
+    fn parses_jpeg_dimensions() {
+        // SOI + SOF0 frame declaring height=120, width=240.
+        let mut d = vec![0xFF, 0xD8];
+        d.extend_from_slice(&[0xFF, 0xC0, 0x00, 0x11, 0x08]);
+        d.extend_from_slice(&120u16.to_be_bytes());
+        d.extend_from_slice(&240u16.to_be_bytes());
+        d.extend_from_slice(&[0x03]);
+        assert_eq!(image_dims(&d), Some((240, 120)));
+    }
+
+    #[test]
+    fn rejects_non_image_and_empty_path() {
+        assert_eq!(image_dims(b"not an image"), None);
+        assert!(load_logo("").is_none());
+        assert!(load_logo("/nonexistent/logo.png").is_none());
     }
 }
