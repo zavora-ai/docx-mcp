@@ -264,5 +264,16 @@ async fn list_templates_returns_catalog() {
         assert!(t["format"].as_str().is_some_and(|s| s.starts_with("business:")), "bad format: {t}");
         assert!(!t["description"].as_str().unwrap_or("").is_empty(), "empty description: {t}");
         assert!(!t["data_keys"].as_str().unwrap_or("").is_empty(), "empty data_keys: {t}");
+        let df = t["data_fields"].as_array().expect("data_fields array");
+        assert!(!df.is_empty(), "empty data_fields: {t}");
+        for fld in df {
+            assert!(fld["name"].as_str().is_some_and(|s| !s.is_empty()), "field missing name: {t}");
+            assert!(matches!(fld["type"].as_str(), Some("text" | "array<string>" | "array<object>")), "bad field type: {fld}");
+        }
     }
+    // The invoice's items field must be a typed object array carrying its item keys.
+    let inv = templates.iter().find(|t| t["format"] == "business:invoice").expect("invoice");
+    let items = inv["data_fields"].as_array().unwrap().iter().find(|f| f["name"] == "items").expect("items field");
+    assert_eq!(items["type"], "array<object>");
+    assert!(items["item_keys"].as_array().unwrap().iter().any(|k| k == "description"), "items missing keys");
 }

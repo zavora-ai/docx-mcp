@@ -4,6 +4,40 @@ use rmcp::{handler::server::wrapper::Parameters, schemars, tool, tool_router};
 use serde::Deserialize;
 use crate::engine::{self, SharedStore};
 
+/// Parse a catalog `data_keys` string into structured field descriptors.
+/// Grammar: comma-separated fields; `name[{a,b,c?}]` = array of objects with
+/// those item keys (`?` marks an optional/derived key), `name[]` = array of
+/// strings, otherwise a plain text field. Splitting respects `[]`/`{}` nesting.
+fn parse_data_keys(s: &str) -> Vec<serde_json::Value> {
+    let mut fields = Vec::new();
+    let mut depth = 0i32;
+    let mut tok = String::new();
+    let mut push = |tok: &str, fields: &mut Vec<serde_json::Value>| {
+        let t = tok.trim();
+        if t.is_empty() { return; }
+        if let Some(name) = t.strip_suffix("[]") {
+            fields.push(serde_json::json!({"name": name, "type": "array<string>"}));
+        } else if let Some(i) = t.find("[{") {
+            let name = &t[..i];
+            let inner = t[i + 2..].trim_end_matches("}]");
+            let item_keys: Vec<&str> = inner.split(',').map(str::trim).filter(|s| !s.is_empty()).collect();
+            fields.push(serde_json::json!({"name": name, "type": "array<object>", "item_keys": item_keys}));
+        } else {
+            fields.push(serde_json::json!({"name": t, "type": "text"}));
+        }
+    };
+    for c in s.chars() {
+        match c {
+            '[' | '{' => { depth += 1; tok.push(c); }
+            ']' | '}' => { depth -= 1; tok.push(c); }
+            ',' if depth == 0 => { push(&tok, &mut fields); tok.clear(); }
+            _ => tok.push(c),
+        }
+    }
+    push(&tok, &mut fields);
+    fields
+}
+
 // ── Input types ──────────────────────────────────────────────────────────────
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
@@ -635,11 +669,14 @@ impl DocxServer {
         serde_json::json!({"handle": handle}).to_string()
     }
 
-    #[tool(description = "List business document templates for create_document. Returns 'templates' (each: format id, description, accepted per-format 'data' keys — [] marks arrays, {} their item shape) and 'style_params' (universal styling keys every template accepts: name, type, default, and note).")]
+    #[tool(description = "List business document templates for create_document. Returns 'templates' (each: format id, description, 'data_keys' human summary, and structured 'data_fields' with name/type/item_keys) and 'style_params' (universal styling keys every template accepts: name, type, default, note).")]
     pub async fn list_templates(&self) -> String {
         let templates: Vec<serde_json::Value> = engine::template_catalog().into_iter()
             .map(|(format, description, data_keys)| serde_json::json!({
-                "format": format, "description": description, "data_keys": data_keys,
+                "format": format,
+                "description": description,
+                "data_keys": data_keys,
+                "data_fields": parse_data_keys(data_keys),
             }))
             .collect();
         let style_params: Vec<serde_json::Value> = engine::style_params().into_iter()
@@ -1803,5 +1840,31 @@ impl DocxServer {
             );
             serde_json::json!({"set": true, "major_font": input.major_font, "minor_font": input.minor_font}).to_string()
         })
+    }
+}
+
+#[cfg(test)]
+mod parse_tests {
+    use super::parse_data_keys;
+
+    #[test]
+    fn parses_text_array_and_object_fields() {
+        let f = parse_data_keys("company, items[{description,qty,price,amount?}], actions[]");
+        assert_eq!(f[0]["name"], "company");
+        assert_eq!(f[0]["type"], "text");
+        assert_eq!(f[1]["name"], "items");
+        assert_eq!(f[1]["type"], "array<object>");
+        assert_eq!(f[1]["item_keys"], serde_json::json!(["description", "qty", "price", "amount?"]));
+        assert_eq!(f[2]["name"], "actions");
+        assert_eq!(f[2]["type"], "array<string>");
+    }
+
+    #[test]
+    fn comma_split_respects_nested_brackets() {
+        // The comma inside experience[{...}] must not split the field.
+        let f = parse_data_keys("name, experience[{title,dates,bullets[]}], skills");
+        assert_eq!(f.len(), 3, "got {f:?}");
+        assert_eq!(f[1]["name"], "experience");
+        assert_eq!(f[1]["item_keys"], serde_json::json!(["title", "dates", "bullets[]"]));
     }
 }
