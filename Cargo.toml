@@ -2,7 +2,7 @@
 name = "docx-mcp-server"
 version = "2.2.0"
 edition = "2021"
-description = "DOCX MCP Server — 31 tools for creating, reading, editing, and converting Word documents with PDF export and professional book formatting"
+description = "DOCX MCP Server — 80 tools for creating, reading, editing, and converting Word documents, with PDF export, KDP book layouts, and parameterized business templates"
 license = "Apache-2.0"
 repository = "https://github.com/zavora-ai/docx-mcp"
 homepage = "https://zavora.ai"

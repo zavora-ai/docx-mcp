@@ -5,7 +5,7 @@
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 [![ADK-Rust Enterprise](https://img.shields.io/badge/ADK--Rust-Enterprise-purple.svg)](https://enterprise.adk-rust.com)
 
-29 MCP tools for creating, reading, editing, formatting, and converting Microsoft Word (.docx) documents. Pure Rust, local-first, no Microsoft Office required.
+80 MCP tools for creating, reading, editing, formatting, and converting Microsoft Word (.docx) documents — plus KDP book layouts and a library of 21 parameterized business templates. Pure Rust, local-first, no Microsoft Office required.
 
 ## Install
 
@@ -25,87 +25,80 @@ cargo install docx-mcp-server
 }
 ```
 
-## Tools (29)
+## Highlights
 
-### Document Lifecycle
-| Tool | Description |
-|------|-------------|
-| `create_document` | Create a new empty DOCX in memory |
-| `open_document` | Open an existing .docx file from disk |
-| `save_document` | Save document to disk as .docx |
-| `close_document` | Close and free memory |
-| `describe_document` | Structural overview (paragraphs, tables, children) |
+- **80 tools** spanning document lifecycle, reading, writing, formatting, tables, media, math/charts/shapes, and export to PDF / HTML / Markdown / plain text.
+- **KDP book formats** — `create_document` accepts `kdp:technical`, `kdp:novel`, `kdp:cookbook`, `kdp:children`, `kdp:interior_design`, `kdp:encyclopedia`, `kdp:manga`.
+- **21 business templates** — publication-grade, fully parameterized via a `data` object (see below).
+- **Discovery** — `list_templates` returns every template's structured `data_fields` (name + type + item shape) and the universal `style_params`, so an agent can learn the schema programmatically.
 
-### Read
-| Tool | Description |
-|------|-------------|
-| `read_paragraphs` | Paginated paragraph listing |
-| `read_paragraph` | Single paragraph with full detail (runs, formatting) |
-| `read_table` | Table content as structured rows/cells |
-| `search_text` | Search across paragraphs (exact, substring, regex) |
+## Business templates
 
-### Write
-| Tool | Description |
-|------|-------------|
-| `insert_paragraph` | Insert paragraph at position with optional style |
-| `replace_text` | Find and replace across all paragraphs |
-| `delete_content` | Delete paragraph, table, or run by index |
-| `insert_run` | Add formatted text run to existing paragraph |
-| `update_paragraph_text` | Replace entire paragraph text |
-| `batch_write` | Multiple write operations in one call |
+`create_document` accepts a `business:*` format plus an optional `data` object that fills the template (missing keys keep a placeholder, so it also works as a blank scaffold). Priced documents auto-sum their line-item totals.
 
-### Format
-| Tool | Description |
-|------|-------------|
-| `set_run_format` | Bold, italic, underline, font, size, color |
-| `set_paragraph_format` | Alignment, spacing, indentation, heading level |
-| `apply_style` | Apply named style to paragraph or run |
+```
+report · resume · letter · memo · invoice · newsletter · academic ·
+proposal · agenda · press_release · certificate · cover_letter ·
+fax_cover · quote · purchase_order · receipt · flyer · contract ·
+meeting_minutes · sign_in_sheet · business_plan
+```
 
-### Tables
-| Tool | Description |
-|------|-------------|
-| `add_table` | Insert table with rows × columns |
-| `set_table_cell` | Write text to specific cell |
-| `add_table_row` | Append row to existing table |
-| `merge_table_cells` | Merge cells horizontally or vertically |
+Every template also accepts universal styling keys: `accent` (hex brand color), `logo` (image path), `logo_align`, `logo_height`, `heading_font`, `body_font`.
 
-### Media & Layout
-| Tool | Description |
-|------|-------------|
-| `add_image` | Insert image from file |
-| `add_list` | Create bulleted or numbered list |
-| `add_section_break` | Section break with page layout |
-| `set_header_footer` | Header/footer content per section |
+```jsonc
+// create_document
+{
+  "format": "business:invoice",
+  "data": {
+    "accent": "#1F6F54",
+    "logo": "/path/to/logo.png",
+    "company": "Northwind Studio",
+    "number": "INV-2048",
+    "bill_to": "Acme Corp",
+    "items": [
+      { "description": "Brand identity design", "qty": 1, "price": 4500 },
+      { "description": "Website UI (12 screens)", "qty": 12, "price": 350 }
+    ]
+  }
+}
+// → TOTAL auto-summed to $8,700.00
+```
 
-### Export
-| Tool | Description |
-|------|-------------|
-| `to_plain_text` | Export as plain text |
-| `to_markdown` | Export as Markdown |
-| `to_html` | Export as HTML fragment |
+Call `list_templates` to discover the accepted `data_fields` and `style_params` for every format.
+
+## Tool groups
+
+| Group | Examples |
+|------|----------|
+| Lifecycle | `create_document`, `open_document`, `save_document`, `close_document`, `describe_document`, `list_templates` |
+| Read | `read_paragraphs`, `read_paragraph`, `read_table`, `search_text` |
+| Write | `insert_paragraph`, `replace_text`, `delete_content`, `insert_run` |
+| Format | `set_run_format`, `set_paragraph_format`, `apply_style` |
+| Tables | `add_table`, `set_table_cell`, `add_table_row`, `merge_table_cells` |
+| Media & layout | `add_image`, `add_page_background`, `add_list`, `add_section_break`, `set_header_footer` |
+| Rich content | `add_equation`, `add_chart`, `add_shape`, `add_content_control`, `embed_font`, `add_building_block`, `add_custom_xml` |
+| Export | `to_plain_text`, `to_markdown`, `to_html`, `save_pdf`, `render_page` |
+
+The authoritative tool list with risk classes lives in [`mcp-server.toml`](mcp-server.toml).
 
 ## Architecture
 
 - **In-memory document store** — LRU eviction (100 docs) + TTL expiry (1 hour)
 - **UUID handles** — documents referenced by handle, not file path
-- **Batch operations** — `batch_write` executes multiple edits atomically
-- **Pure Rust** — uses [docx-rs](https://crates.io/crates/docx-rs) for OOXML manipulation
+- **Pure Rust** — built on [`zavora-docx`](https://crates.io/crates/zavora-docx) for OOXML, layout, and PDF/HTML/Markdown rendering
 - **No system deps** — no LibreOffice, no Microsoft Office
 
-## Example Workflow
+## Example workflow
 
 ```
-Agent: create_document(title: "Quarterly Report")
+Agent: list_templates()
+  → discovers business:invoice accepts items[{description,qty,price,amount?}]
+
+Agent: create_document(format: "business:invoice", data: { company: "...", items: [...] })
   → handle: "abc-123..."
 
-Agent: insert_paragraph(doc_id: "abc-123", index: 0, text: "Q1 2026 Report", style: "Heading1")
-Agent: insert_paragraph(doc_id: "abc-123", index: 1, text: "Revenue grew 45% YoY...")
-Agent: add_table(doc_id: "abc-123", rows: 4, cols: 3, index: 2)
-Agent: set_table_cell(doc_id: "abc-123", table_index: 0, row: 0, col: 0, text: "Metric")
-
-Agent: save_document(doc_id: "abc-123", path: "/reports/q1-2026.docx")
-Agent: to_markdown(doc_id: "abc-123")
-  → "# Q1 2026 Report\n\nRevenue grew 45% YoY..."
+Agent: render_page(document_handle: "abc-123", page_index: 0, output_path: "/tmp/preview.png")
+Agent: save_document(document_handle: "abc-123", output_path: "/invoices/inv-2048.docx")
 ```
 
 ## License
@@ -114,6 +107,6 @@ Apache-2.0
 
 ---
 
-Part of the [ADK-Rust Enterprise](https://enterprise.adk-rust.com) MCP server ecosystem.
+Document engine: [`zavora-docx`](https://crates.io/crates/zavora-docx), itself built on [rdocx](https://github.com/tensorbee/rdocx) by Atul Sharma.
 
-Built with ❤️ by [Zavora AI](https://zavora.ai)
+Part of the [ADK-Rust Enterprise](https://enterprise.adk-rust.com) MCP server ecosystem. Built with ❤️ by [Zavora AI](https://zavora.ai)
