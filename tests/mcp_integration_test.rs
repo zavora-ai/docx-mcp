@@ -277,3 +277,26 @@ async fn list_templates_returns_catalog() {
     assert_eq!(items["type"], "array<object>");
     assert!(items["item_keys"].as_array().unwrap().iter().any(|k| k == "description"), "items missing keys");
 }
+
+
+#[tokio::test]
+async fn tracked_changes_author_list_resolve() {
+    let srv = DocxServer::new();
+    let h = json(&srv.create_document(Parameters(CreateInput { title: Some("TC".into()), format: None, data: None })).await)
+        ["handle"].as_str().unwrap().to_string();
+    srv.insert_paragraph(Parameters(InsertParaInput { document_handle: h.clone(), index: 0, text: "base".into(), style: None, page_break_before: None })).await;
+
+    // Author one insertion + one deletion as the agent.
+    srv.add_tracked_insert(Parameters(TrackedInsertInput { document_handle: h.clone(), paragraph_index: 0, text: "INS".into(), author: "Agent".into() })).await;
+    srv.add_tracked_delete(Parameters(TrackedDeleteInput { document_handle: h.clone(), paragraph_index: 0, text: "DEL".into(), author: "Agent".into() })).await;
+
+    // List: 2 changes, both by Agent.
+    let listed = json(&srv.list_tracked_changes(Parameters(HandleInput { document_handle: h.clone() })).await);
+    assert_eq!(listed["count"], 2);
+    assert!(listed["changes"].as_array().unwrap().iter().all(|c| c["author"] == "Agent"));
+
+    // Accept all → resolved 2, none remain.
+    let r = json(&srv.resolve_tracked_changes(Parameters(ResolveTrackedInput { document_handle: h.clone(), accept: true, change_id: None })).await);
+    assert_eq!(r["resolved"], 2);
+    assert_eq!(json(&srv.list_tracked_changes(Parameters(HandleInput { document_handle: h })).await)["count"], 0);
+}

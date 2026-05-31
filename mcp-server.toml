@@ -487,6 +487,20 @@ requires_approval = false
 credential_bindings = []
 
 [[tools]]
+name = "list_tracked_changes"
+description = "List all tracked changes (revisions) in the document. Returns each change's id, author, and kind (insertion/deletion) so a reviewer can accept or reject them."
+risk_class = "local_read"
+requires_approval = false
+credential_bindings = []
+
+[[tools]]
+name = "resolve_tracked_changes"
+description = "Accept or reject tracked changes (revisions). Accept makes insertions permanent and removes deletions; reject removes insertions and restores deletions. Resolves a specific change_id, or all changes if omitted."
+risk_class = "local_write"
+requires_approval = false
+credential_bindings = []
+
+[[tools]]
 name = "add_form_text_field"
 description = "Add a text input form field to a paragraph."
 risk_class = "local_write"

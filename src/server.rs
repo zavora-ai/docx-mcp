@@ -538,6 +538,13 @@ pub struct TrackedInsertInput { pub document_handle: String, pub paragraph_index
 pub struct TrackedDeleteInput { pub document_handle: String, pub paragraph_index: usize, pub text: String, pub author: String }
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct ResolveTrackedInput { pub document_handle: String,
+    /// true = accept (insertions stay, deletions removed); false = reject (insertions removed, deletions restored)
+    pub accept: bool,
+    /// Specific change id to resolve. Omit to resolve ALL tracked changes.
+    pub change_id: Option<String> }
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
 pub struct TextFieldInput { pub document_handle: String, pub paragraph_index: usize, pub name: String, pub default_value: Option<String>, pub label: Option<String> }
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
@@ -1677,6 +1684,25 @@ impl DocxServer {
                 }
                 None => serde_json::json!({"error": "INDEX_OUT_OF_BOUNDS"}).to_string(),
             }
+        })
+    }
+
+    #[tool(description = "List all tracked changes (revisions) in the document. Returns each change's id, author, and kind (insertion/deletion) so a reviewer can accept or reject them.")]
+    pub async fn list_tracked_changes(&self, Parameters(input): Parameters<HandleInput>) -> String {
+        with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
+            let items: Vec<serde_json::Value> = doc.tracked_changes().into_iter().map(|(id, author, is_ins)| {
+                serde_json::json!({"id": id, "author": author, "kind": if is_ins {"insertion"} else {"deletion"}})
+            }).collect();
+            serde_json::json!({"count": items.len(), "changes": items}).to_string()
+        })
+    }
+
+    #[tool(description = "Accept or reject tracked changes (revisions). Accept makes insertions permanent and removes deletions; reject removes insertions and restores deletions. Resolves a specific change_id, or all changes if omitted.")]
+    pub async fn resolve_tracked_changes(&self, Parameters(input): Parameters<ResolveTrackedInput>) -> String {
+        with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
+            let id = input.change_id.as_deref();
+            let n = if input.accept { doc.accept_tracked_changes(id) } else { doc.reject_tracked_changes(id) };
+            serde_json::json!({"resolved": n, "accepted": input.accept}).to_string()
         })
     }
 
