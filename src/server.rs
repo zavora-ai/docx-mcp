@@ -635,6 +635,16 @@ impl DocxServer {
         serde_json::json!({"handle": handle}).to_string()
     }
 
+    #[tool(description = "List business document templates available to create_document. Returns each format id, a description, and the accepted 'data' keys (with [] marking array fields and {} their item shape).")]
+    pub async fn list_templates(&self) -> String {
+        let templates: Vec<serde_json::Value> = engine::template_catalog().into_iter()
+            .map(|(format, description, data_keys)| serde_json::json!({
+                "format": format, "description": description, "data_keys": data_keys,
+            }))
+            .collect();
+        serde_json::json!({"templates": templates}).to_string()
+    }
+
     #[tool(description = "Create a professionally-styled novel with author-specific settings (trim size, font, spacing). Sets justified body text, widow control, chapter-opener heading style, and a running header. Use insert_paragraph with style=Heading1 for chapter titles (drives the TOC), TitlePage/Subtitle/Author for the title page, and BodyText/BodyTextIndent for prose.")]
     pub async fn create_novel(&self, Parameters(input): Parameters<NovelInput>) -> String {
         let mut doc = zavora_docx::Document::new();

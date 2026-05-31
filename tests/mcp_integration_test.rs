@@ -246,3 +246,18 @@ async fn contract_renders_supplied_clauses() {
     let text = json(&srv.to_plain_text(Parameters(ExportInput { document_handle: h })).await)["text"].as_str().unwrap().to_string();
     assert!(text.contains("Deliver a website."), "clause missing: {text}");
 }
+
+#[tokio::test]
+async fn list_templates_returns_catalog() {
+    let srv = DocxServer::new();
+    let r = srv.list_templates().await;
+    let v = json(&r);
+    let templates = v["templates"].as_array().expect("templates array");
+    assert_eq!(templates.len(), 21, "expected 21 business templates");
+    // Every entry must carry a format, description, and data_keys.
+    for t in templates {
+        assert!(t["format"].as_str().is_some_and(|s| s.starts_with("business:")), "bad format: {t}");
+        assert!(!t["description"].as_str().unwrap_or("").is_empty(), "empty description: {t}");
+        assert!(!t["data_keys"].as_str().unwrap_or("").is_empty(), "empty data_keys: {t}");
+    }
+}

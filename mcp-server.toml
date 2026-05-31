@@ -18,6 +18,13 @@ requires_approval = false
 credential_bindings = []
 
 [[tools]]
+name = "list_templates"
+description = "List business document templates available to create_document. Returns each format id, a description, and the accepted 'data' keys (with ..."
+risk_class = "read_only"
+requires_approval = false
+credential_bindings = []
+
+[[tools]]
 name = "create_novel"
 description = "Create a professionally-styled novel with author-specific settings (trim size, font, spacing). Sets justified body text, widow control, c..."
 risk_class = "local_write"

@@ -1045,6 +1045,34 @@ pub fn create_business_plan(doc: &mut Document, f: &Fields) {
     }
 }
 
+/// Catalog of business template formats: (format id, description, accepted
+/// data keys). Single source of truth for the list_templates tool.
+pub fn template_catalog() -> Vec<(&'static str, &'static str, &'static str)> {
+    vec![
+        ("business:report", "Business report with ruled sections and page numbers", "title, subtitle, author, date, summary, introduction, findings, recommendations, conclusion"),
+        ("business:resume", "Resume/CV with ruled sections and tab-aligned dates", "name, contact, summary, skills, experience[{title,dates,location,bullets[]}], education[{degree,year}]"),
+        ("business:letter", "Block-format business letter", "sender_name, sender_address, sender_city, date, recipient_name, recipient_title, recipient_address, salutation, opening, body, closing, sign_off"),
+        ("business:memo", "Memo with TO/FROM/DATE/RE block", "to, from, date, re, purpose, body, closing"),
+        ("business:invoice", "Invoice with priced line items and total", "company, company_details, number, date, due, bill_to, items[{description,qty,price,amount?}], terms"),
+        ("business:newsletter", "Two-column newsletter with ruled masthead", "title, masthead, lead, secondary, events"),
+        ("business:academic", "Double-spaced academic paper", "title, author, affiliation, abstract, introduction, methods, results, discussion, references"),
+        ("business:proposal", "Project proposal with priced deliverables", "title, client, author, date, overview, scope, timeline, items[{description,qty,price,amount?}], acceptance"),
+        ("business:agenda", "Meeting agenda with timed items", "title, date, time, location, attendees, items[{topic,owner,duration}], notes"),
+        ("business:press_release", "Press release with dateline and boilerplate", "status, headline, subhead, dateline, body, body2, organization, boilerplate, contact"),
+        ("business:certificate", "Landscape award certificate", "title, presented, recipient, reason, date, signature"),
+        ("business:cover_letter", "Job application cover letter", "name, contact, date, recipient, company, salutation, opening, body, closing"),
+        ("business:fax_cover", "Fax cover sheet with routing block", "to, from, fax, phone, date, pages, message"),
+        ("business:quote", "Price quote with priced items", "company, company_details, number, date, valid_until, client, items[{description,qty,price,amount?}], notes"),
+        ("business:purchase_order", "Purchase order with vendor/ship-to", "company, number, date, vendor, ship_to, items[{description,qty,price,amount?}], terms"),
+        ("business:receipt", "Payment receipt showing amount paid", "company, number, date, method, payer, items[{description,qty,price,amount?}], note"),
+        ("business:flyer", "Event flyer with centered details", "headline, subhead, when, where, details, cta"),
+        ("business:contract", "Agreement with numbered clauses and signatures", "title, date, party_a, party_b, clauses[{title,body}]"),
+        ("business:meeting_minutes", "Minutes with discussion and action items", "title, date, time, location, attendees, discussion, actions[]"),
+        ("business:sign_in_sheet", "Bordered attendee sign-in grid", "title, event, date"),
+        ("business:business_plan", "Business plan with standard sections", "company, tagline, date, summary, description, market, organization, products, marketing, financials"),
+    ]
+}
+
 // ── Paragraph helpers ────────────────────────────────────────────────────────
 
 /// Syntax highlighting colors for common tokens.
