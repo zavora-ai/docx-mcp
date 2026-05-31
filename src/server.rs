@@ -1080,6 +1080,19 @@ impl DocxServer {
         })
     }
 
+    #[tool(description = "Page layout for a paginated view: page width/height and margins (CSS px @96dpi) plus rendered header/footer HTML. Pair with editable_html (body) to render letter-sized pages with headers/footers.")]
+    pub async fn page_layout(&self, Parameters(input): Parameters<ExportInput>) -> String {
+        with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
+            let p = doc.page_layout();
+            serde_json::json!({
+                "page_width": p.page_width, "page_height": p.page_height,
+                "margin_top": p.margin_top, "margin_right": p.margin_right,
+                "margin_bottom": p.margin_bottom, "margin_left": p.margin_left,
+                "header_html": p.header_html, "footer_html": p.footer_html,
+            }).to_string()
+        })
+    }
+
     #[tool(description = "Export document as PDF. Saves to the given file path.")]
     pub async fn save_pdf(&self, Parameters(input): Parameters<SavePdfInput>) -> String {
         with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
