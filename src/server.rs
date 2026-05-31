@@ -336,6 +336,10 @@ pub struct DeleteInput { pub document_handle: String, pub index: usize }
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
 pub struct UpdateParaInput { pub document_handle: String, pub index: usize, pub text: String }
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct RunSpec { pub text: String, pub bold: Option<bool>, pub italic: Option<bool>, pub underline: Option<bool> }
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct ParaRunsInput { pub document_handle: String, pub index: usize, pub runs: Vec<RunSpec> }
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
 pub struct RunFormatInput { pub document_handle: String, pub paragraph_index: usize, pub text: String, pub bold: Option<bool>, pub italic: Option<bool>, pub underline: Option<bool>, pub font: Option<String>, pub size: Option<f64>, pub color: Option<String>, pub language: Option<String> }
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
@@ -1153,6 +1157,26 @@ impl DocxServer {
             } else {
                 serde_json::json!({"error": "INDEX_OUT_OF_BOUNDS"}).to_string()
             }
+        })
+    }
+
+    #[tool(description = "Replace a paragraph's content with formatted runs, preserving its style. Each run: {text, bold?, italic?, underline?}. Use for in-place edits that keep inline formatting.")]
+    pub async fn set_paragraph_runs(&self, Parameters(input): Parameters<ParaRunsInput>) -> String {
+        with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
+            if input.index >= doc.paragraph_count() { return serde_json::json!({"error": "INDEX_OUT_OF_BOUNDS"}).to_string(); }
+            // Preserve the existing paragraph style id, if any.
+            let style = doc.paragraphs().get(input.index).and_then(|p| p.style_id().map(String::from));
+            doc.remove_content(input.index);
+            let mut para = doc.insert_paragraph(input.index, "");
+            if let Some(ref s) = style { para = para.style(s); }
+            for r in &input.runs {
+                let mut run = para.add_run(&r.text);
+                if r.bold.unwrap_or(false) { run = run.bold(true); }
+                if r.italic.unwrap_or(false) { run = run.italic(true); }
+                if r.underline.unwrap_or(false) { run = run.underline(true); }
+                let _ = run;
+            }
+            serde_json::json!({"updated": true, "index": input.index, "runs": input.runs.len()}).to_string()
         })
     }
 
