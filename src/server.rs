@@ -1224,9 +1224,20 @@ impl DocxServer {
     #[tool(description = "Update paragraph text at given index (replaces entire paragraph text).")]
     pub async fn update_paragraph_text(&self, Parameters(input): Parameters<UpdateParaInput>) -> String {
         with_doc!(self.store, input.document_handle, |doc: &mut zavora_docx::Document| {
-            if input.index >= doc.paragraph_count() { return serde_json::json!({"error": "INDEX_OUT_OF_BOUNDS"}).to_string(); }
-            doc.remove_content(input.index);
-            doc.insert_paragraph(input.index, &input.text);
+            // The index is into the body's content, which is what the editable HTML's data-p
+            // carries — not into the paragraphs alone. Comparing it to paragraph_count() rejects
+            // valid indices in any document that contains a table.
+            //
+            // And the words are replaced in place rather than by removing the content and
+            // inserting a plain paragraph, which took the style with it: editing the text of a
+            // heading turned it into body text.
+            if !doc.set_paragraph_text(input.index, &input.text) {
+                return serde_json::json!({
+                    "status": "error",
+                    "message": "That is not a paragraph you can change"
+                })
+                .to_string();
+            }
             serde_json::json!({"updated": true, "index": input.index}).to_string()
         })
     }
