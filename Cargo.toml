@@ -12,7 +12,7 @@ readme = "README.md"
 exclude = [".cargo/"]
 
 [dependencies]
-rmcp = { version = "1.7", features = ["server", "transport-io", "macros"] }
+rmcp = { version = "3.1.2", features = ["server", "transport-io", "macros"] }
 zavora-docx = "0.1"
 tokio = { version = "1", features = ["full"] }
 serde = { version = "1", features = ["derive"] }
