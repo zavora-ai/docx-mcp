@@ -642,7 +642,7 @@ macro_rules! with_doc {
     }};
 }
 
-#[tool_router(server_handler)]
+#[tool_router]
 impl DocxServer {
     #[tool(description = "Create a new DOCX document. KDP book formats: 'kdp:technical' (6x9), 'kdp:novel' (5.25x8), 'kdp:cookbook' (8x10), 'kdp:children' (8.5x8.5), 'kdp:interior_design' (8.5x11), 'kdp:encyclopedia' (8.5x11 2-col), 'kdp:manga' (5x7.5). Business/professional formats (US Letter, themed, with seeded scaffold): 'business:report', 'business:resume', 'business:letter', 'business:memo', 'business:invoice', 'business:newsletter', 'business:academic', 'business:proposal', 'business:agenda', 'business:press_release', 'business:certificate', 'business:cover_letter', 'business:fax_cover', 'business:quote', 'business:purchase_order', 'business:receipt', 'business:flyer', 'business:contract', 'business:meeting_minutes', 'business:sign_in_sheet', 'business:business_plan'. Omit format for a blank document.")]
     pub async fn create_document(&self, Parameters(input): Parameters<CreateInput>) -> String {
@@ -1988,4 +1988,11 @@ mod parse_tests {
         assert_eq!(f[1]["name"], "experience");
         assert_eq!(f[1]["item_keys"], serde_json::json!(["title", "dates", "bullets[]"]));
     }
+}
+
+adk_mcp_sdk::mcp_2026_server! {
+    server: DocxServer,
+    task_tools: ["insert_run", "render_page"],
+    approval_tools: [],
+    cache_ttl_ms: 60_000,
 }
