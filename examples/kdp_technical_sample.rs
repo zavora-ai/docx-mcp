@@ -1,5 +1,5 @@
-use zavora_docx::{Document, Length, Alignment, BorderStyle};
 use docx_mcp_server::engine;
+use zavora_docx::{Alignment, BorderStyle, Document, Length};
 
 fn main() {
     let mut doc = Document::new();
@@ -9,7 +9,10 @@ fn main() {
 
     // === TITLE PAGE === (named styles: Title + Subtitle)
     let mut p = doc.add_paragraph("");
-    p = p.style("Title").alignment(Alignment::Center).space_before(Length::inches(2.5));
+    p = p
+        .style("Title")
+        .alignment(Alignment::Center)
+        .space_before(Length::inches(2.5));
     p.add_run("Building MCP Servers in Rust");
 
     let mut p = doc.add_paragraph("");
@@ -17,7 +20,9 @@ fn main() {
     p.add_run("A Practical Guide to the Model Context Protocol");
 
     let mut p = doc.add_paragraph("");
-    p = p.alignment(Alignment::Center).space_before(Length::inches(1.5));
+    p = p
+        .alignment(Alignment::Center)
+        .space_before(Length::inches(1.5));
     p.add_run("James Karanja").size(16.0);
 
     // === COPYRIGHT PAGE === (Caption style for fine print)
@@ -28,7 +33,9 @@ fn main() {
         "First Edition, May 2026",
     ] {
         let mut p = doc.add_paragraph("");
-        if line.starts_with("Copyright") { p = p.page_break_before(true).space_before(Length::inches(5.0)); }
+        if line.starts_with("Copyright") {
+            p = p.page_break_before(true).space_before(Length::inches(5.0));
+        }
         p = p.style("Caption");
         p.add_run(line);
     }
@@ -82,18 +89,34 @@ fn main() {
     p.add_run("Table 1.1: Core MCP Concepts");
 
     let mut table = doc.add_table(5, 3);
-    table = table.width_pct(100.0).borders(BorderStyle::Single, 4, "CCCCCC");
+    table = table
+        .width_pct(100.0)
+        .borders(BorderStyle::Single, 4, "CCCCCC");
     let rows = [
         ("Concept", "Description", "Example"),
-        ("Tool", "A function the server exposes", "read_file, search_code"),
+        (
+            "Tool",
+            "A function the server exposes",
+            "read_file, search_code",
+        ),
         ("Resource", "Data the server provides", "file://, git://"),
-        ("Prompt", "Reusable prompt templates", "code_review, summarize"),
+        (
+            "Prompt",
+            "Reusable prompt templates",
+            "code_review, summarize",
+        ),
         ("Transport", "Communication channel", "stdio, HTTP+SSE"),
     ];
     for (r, (a, b, c)) in rows.iter().enumerate() {
-        if let Some(mut cell) = table.cell(r, 0) { cell.set_text(a); }
-        if let Some(mut cell) = table.cell(r, 1) { cell.set_text(b); }
-        if let Some(mut cell) = table.cell(r, 2) { cell.set_text(c); }
+        if let Some(mut cell) = table.cell(r, 0) {
+            cell.set_text(a);
+        }
+        if let Some(mut cell) = table.cell(r, 1) {
+            cell.set_text(b);
+        }
+        if let Some(mut cell) = table.cell(r, 2) {
+            cell.set_text(c);
+        }
     }
     table.header_row_style("2E4057", "FFFFFF");
     table.banded_rows("F0F4F8");
@@ -106,7 +129,9 @@ fn main() {
 
     let mut p = doc.add_paragraph("");
     p = p.first_line_indent(Length::inches(0.3));
-    p.add_run("Let's build a minimal MCP server that exposes a single tool. Add the following to your ");
+    p.add_run(
+        "Let's build a minimal MCP server that exposes a single tool. Add the following to your ",
+    );
     p.add_run("Cargo.toml").font("Courier New").size(10.0);
     p.add_run(":");
 
@@ -149,15 +174,20 @@ async fn main() -> anyhow::Result<()> {
     let mut p = doc.add_paragraph("");
     p.add_run("In this chapter, we'll explore the two transport mechanisms MCP supports: stdio (for local tools) and Streamable HTTP (for remote servers).");
 
-    let rel = doc.add_hyperlink_rel("https://modelcontextprotocol.io/specification/2025-03-26/basic/transports");
+    let rel = doc.add_hyperlink_rel(
+        "https://modelcontextprotocol.io/specification/2025-03-26/basic/transports",
+    );
     let mut p = doc.add_paragraph("");
     p = p.style("Caption");
     p.add_run("Further reading: ");
-    p.add_hyperlink_run("MCP Transport Specification", Some(&rel), None).color("2980B9").underline(true);
+    p.add_hyperlink_run("MCP Transport Specification", Some(&rel), None)
+        .color("2980B9")
+        .underline(true);
 
     // Insert TOC now that all headings exist (scanned from document body)
     doc.insert_toc(toc_index, 2);
 
-    doc.save("/Users/jameskaranja/Downloads/kdp_technical_sample.docx").unwrap();
+    doc.save("/Users/jameskaranja/Downloads/kdp_technical_sample.docx")
+        .unwrap();
     println!("✓ Saved ~/Downloads/kdp_technical_sample.docx");
 }

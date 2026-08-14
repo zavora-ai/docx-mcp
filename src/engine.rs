@@ -1,10 +1,10 @@
 //! Core document engine using rdocx.
 
-use zavora_docx::{Document, Length, BorderStyle, Alignment};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use uuid::Uuid;
+use zavora_docx::{Alignment, BorderStyle, Document, Length};
 
 /// In-memory document store.
 pub struct Store {
@@ -13,7 +13,9 @@ pub struct Store {
 
 impl Store {
     pub fn new() -> Self {
-        Self { docs: HashMap::new() }
+        Self {
+            docs: HashMap::new(),
+        }
     }
 
     pub fn insert(&mut self, doc: Document) -> String {
@@ -31,6 +33,12 @@ impl Store {
     }
 }
 
+impl Default for Store {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 pub type SharedStore = Arc<Mutex<Store>>;
 
 pub fn new_store() -> SharedStore {
@@ -42,18 +50,34 @@ pub fn new_store() -> SharedStore {
 /// Create a KDP-formatted technical book document (6×9, Garamond, proper styles).
 pub fn create_kdp_technical(doc: &mut Document) {
     doc.set_page_size(Length::inches(6.0), Length::inches(9.0));
-    doc.set_margins(Length::inches(0.75), Length::inches(0.75), Length::inches(0.75), Length::inches(0.875));
+    doc.set_margins(
+        Length::inches(0.75),
+        Length::inches(0.75),
+        Length::inches(0.75),
+        Length::inches(0.875),
+    );
     doc.set_footer_page_number();
     doc.set_different_first_page(true);
     doc.set_first_page_footer("");
     doc.set_title("Untitled Technical Book");
     doc.set_gutter(Length::inches(0.125));
     doc.set_theme(
-        &[("dk1","000000"),("lt1","FFFFFF"),("dk2","2E4057"),("lt2","F5F5F5"),
-          ("accent1","2980B9"),("accent2","E74C3C"),("accent3","27AE60"),
-          ("accent4","F39C12"),("accent5","8E44AD"),("accent6","16A085"),
-          ("hlink","2980B9"),("folHlink","8E44AD")],
-        "Garamond", "Garamond",
+        &[
+            ("dk1", "000000"),
+            ("lt1", "FFFFFF"),
+            ("dk2", "2E4057"),
+            ("lt2", "F5F5F5"),
+            ("accent1", "2980B9"),
+            ("accent2", "E74C3C"),
+            ("accent3", "27AE60"),
+            ("accent4", "F39C12"),
+            ("accent5", "8E44AD"),
+            ("accent6", "16A085"),
+            ("hlink", "2980B9"),
+            ("folHlink", "8E44AD"),
+        ],
+        "Garamond",
+        "Garamond",
     );
 }
 
@@ -101,7 +125,12 @@ pub fn create_novel(doc: &mut Document, cfg: &NovelConfig) {
     let (w, h) = cfg.trim;
     doc.set_page_size(Length::inches(w), Length::inches(h));
     // Generous inner (binding) margin scales a little with page height.
-    doc.set_margins(Length::inches(0.75), Length::inches(0.625), Length::inches(0.75), Length::inches(0.875));
+    doc.set_margins(
+        Length::inches(0.75),
+        Length::inches(0.625),
+        Length::inches(0.75),
+        Length::inches(0.875),
+    );
     doc.set_gutter(Length::inches(0.125));
     doc.set_footer_page_number();
     doc.set_different_first_page(true);
@@ -115,11 +144,22 @@ pub fn create_novel(doc: &mut Document, cfg: &NovelConfig) {
         doc.set_auto_hyphenation(true);
     }
     doc.set_theme(
-        &[("dk1","1A1A1A"),("lt1","FFFFF8"),("dk2","333333"),("lt2","F8F4E8"),
-          ("accent1","8B4513"),("accent2","2F4F4F"),("accent3","800020"),
-          ("accent4","4A4A4A"),("accent5","6B4423"),("accent6","2E4A3E"),
-          ("hlink","8B4513"),("folHlink","800020")],
-        &cfg.font, &cfg.font,
+        &[
+            ("dk1", "1A1A1A"),
+            ("lt1", "FFFFF8"),
+            ("dk2", "333333"),
+            ("lt2", "F8F4E8"),
+            ("accent1", "8B4513"),
+            ("accent2", "2F4F4F"),
+            ("accent3", "800020"),
+            ("accent4", "4A4A4A"),
+            ("accent5", "6B4423"),
+            ("accent6", "2E4A3E"),
+            ("hlink", "8B4513"),
+            ("folHlink", "800020"),
+        ],
+        &cfg.font,
+        &cfg.font,
     );
 
     // Body text: justified, widow control, author's font/size/spacing.
@@ -210,7 +250,10 @@ fn apply_book_styles(doc: &mut Document, s: &BookStyle) {
                 .bold(true)
                 .color(s.heading_color)
                 .align("left")
-                .spacing(Length::pt(if n == 1 { 20.0 } else { 14.0 }), Length::pt(6.0))
+                .spacing(
+                    Length::pt(if n == 1 { 20.0 } else { 14.0 }),
+                    Length::pt(6.0),
+                )
                 .keep_with_next(true)
                 .outline_level(lvl),
         );
@@ -219,90 +262,187 @@ fn apply_book_styles(doc: &mut Document, s: &BookStyle) {
 
 pub fn create_kdp_cookbook(doc: &mut Document) {
     doc.set_page_size(Length::inches(8.0), Length::inches(10.0));
-    doc.set_margins(Length::inches(0.75), Length::inches(0.75), Length::inches(0.75), Length::inches(1.0));
+    doc.set_margins(
+        Length::inches(0.75),
+        Length::inches(0.75),
+        Length::inches(0.75),
+        Length::inches(1.0),
+    );
     doc.set_footer_page_number();
     doc.set_different_first_page(true);
     doc.set_first_page_footer("");
     doc.set_title("Untitled Cookbook");
     doc.set_theme(
-        &[("dk1","2C2C2C"),("lt1","FFFFFF"),("dk2","4A3728"),("lt2","FFF8F0"),
-          ("accent1","D4A574"),("accent2","C0392B"),("accent3","27AE60"),
-          ("accent4","F4D03F"),("accent5","E67E22"),("accent6","6C3483"),
-          ("hlink","C0392B"),("folHlink","6C3483")],
-        "Gill Sans MT", "Georgia",
+        &[
+            ("dk1", "2C2C2C"),
+            ("lt1", "FFFFFF"),
+            ("dk2", "4A3728"),
+            ("lt2", "FFF8F0"),
+            ("accent1", "D4A574"),
+            ("accent2", "C0392B"),
+            ("accent3", "27AE60"),
+            ("accent4", "F4D03F"),
+            ("accent5", "E67E22"),
+            ("accent6", "6C3483"),
+            ("hlink", "C0392B"),
+            ("folHlink", "6C3483"),
+        ],
+        "Gill Sans MT",
+        "Georgia",
     );
-    apply_book_styles(doc, &BookStyle {
-        body_font: "Georgia", heading_font: "Gill Sans MT",
-        body_pt: 11.0, line_spacing: 1.25, justified: true, heading_color: "C0392B",
-    });
+    apply_book_styles(
+        doc,
+        &BookStyle {
+            body_font: "Georgia",
+            heading_font: "Gill Sans MT",
+            body_pt: 11.0,
+            line_spacing: 1.25,
+            justified: true,
+            heading_color: "C0392B",
+        },
+    );
 }
 
 pub fn create_kdp_children(doc: &mut Document) {
     doc.set_page_size(Length::inches(8.5), Length::inches(8.5));
-    doc.set_margins(Length::inches(0.5), Length::inches(0.5), Length::inches(0.5), Length::inches(0.5));
+    doc.set_margins(
+        Length::inches(0.5),
+        Length::inches(0.5),
+        Length::inches(0.5),
+        Length::inches(0.5),
+    );
     doc.set_footer_page_number();
     doc.set_different_first_page(true);
     doc.set_first_page_footer("");
     doc.set_title("Untitled Children's Book");
     doc.set_theme(
-        &[("dk1","2C3E50"),("lt1","FFFFFF"),("dk2","34495E"),("lt2","FDFEFE"),
-          ("accent1","3498DB"),("accent2","E74C3C"),("accent3","2ECC71"),
-          ("accent4","F1C40F"),("accent5","9B59B6"),("accent6","E67E22"),
-          ("hlink","3498DB"),("folHlink","9B59B6")],
-        "Century Schoolbook", "Century Schoolbook",
+        &[
+            ("dk1", "2C3E50"),
+            ("lt1", "FFFFFF"),
+            ("dk2", "34495E"),
+            ("lt2", "FDFEFE"),
+            ("accent1", "3498DB"),
+            ("accent2", "E74C3C"),
+            ("accent3", "2ECC71"),
+            ("accent4", "F1C40F"),
+            ("accent5", "9B59B6"),
+            ("accent6", "E67E22"),
+            ("hlink", "3498DB"),
+            ("folHlink", "9B59B6"),
+        ],
+        "Century Schoolbook",
+        "Century Schoolbook",
     );
     // Children: large, well-spaced, left-aligned (never justified) for early readers.
-    apply_book_styles(doc, &BookStyle {
-        body_font: "Century Schoolbook", heading_font: "Century Schoolbook",
-        body_pt: 16.0, line_spacing: 1.5, justified: false, heading_color: "E74C3C",
-    });
+    apply_book_styles(
+        doc,
+        &BookStyle {
+            body_font: "Century Schoolbook",
+            heading_font: "Century Schoolbook",
+            body_pt: 16.0,
+            line_spacing: 1.5,
+            justified: false,
+            heading_color: "E74C3C",
+        },
+    );
 }
 
 pub fn create_kdp_interior_design(doc: &mut Document) {
     doc.set_page_size(Length::inches(8.5), Length::inches(11.0));
-    doc.set_margins(Length::inches(0.75), Length::inches(0.75), Length::inches(0.75), Length::inches(0.875));
+    doc.set_margins(
+        Length::inches(0.75),
+        Length::inches(0.75),
+        Length::inches(0.75),
+        Length::inches(0.875),
+    );
     doc.set_footer_page_number();
     doc.set_different_first_page(true);
     doc.set_first_page_footer("");
     doc.set_title("Untitled Interior Design Book");
     doc.set_theme(
-        &[("dk1","1C1C1C"),("lt1","FFFFFF"),("dk2","3D3D3D"),("lt2","F7F7F7"),
-          ("accent1","B8860B"),("accent2","2F4F4F"),("accent3","8B7355"),
-          ("accent4","CD853F"),("accent5","556B2F"),("accent6","4682B4"),
-          ("hlink","B8860B"),("folHlink","2F4F4F")],
-        "Futura", "Minion Pro",
+        &[
+            ("dk1", "1C1C1C"),
+            ("lt1", "FFFFFF"),
+            ("dk2", "3D3D3D"),
+            ("lt2", "F7F7F7"),
+            ("accent1", "B8860B"),
+            ("accent2", "2F4F4F"),
+            ("accent3", "8B7355"),
+            ("accent4", "CD853F"),
+            ("accent5", "556B2F"),
+            ("accent6", "4682B4"),
+            ("hlink", "B8860B"),
+            ("folHlink", "2F4F4F"),
+        ],
+        "Futura",
+        "Minion Pro",
     );
-    apply_book_styles(doc, &BookStyle {
-        body_font: "Minion Pro", heading_font: "Futura",
-        body_pt: 11.0, line_spacing: 1.3, justified: true, heading_color: "B8860B",
-    });
+    apply_book_styles(
+        doc,
+        &BookStyle {
+            body_font: "Minion Pro",
+            heading_font: "Futura",
+            body_pt: 11.0,
+            line_spacing: 1.3,
+            justified: true,
+            heading_color: "B8860B",
+        },
+    );
 }
 
 pub fn create_kdp_encyclopedia(doc: &mut Document) {
     doc.set_page_size(Length::inches(8.5), Length::inches(11.0));
-    doc.set_margins(Length::inches(0.625), Length::inches(0.75), Length::inches(0.625), Length::inches(1.0));
+    doc.set_margins(
+        Length::inches(0.625),
+        Length::inches(0.75),
+        Length::inches(0.625),
+        Length::inches(1.0),
+    );
     doc.set_columns(2, Length::inches(0.25));
     doc.set_footer_page_number();
     doc.set_different_first_page(true);
     doc.set_first_page_footer("");
     doc.set_title("Untitled Encyclopedia");
     doc.set_theme(
-        &[("dk1","000000"),("lt1","FFFFFF"),("dk2","1B2631"),("lt2","EAECEE"),
-          ("accent1","1A5276"),("accent2","922B21"),("accent3","196F3D"),
-          ("accent4","7D6608"),("accent5","6C3483"),("accent6","1B4F72"),
-          ("hlink","1A5276"),("folHlink","6C3483")],
-        "Myriad Pro", "Minion Pro",
+        &[
+            ("dk1", "000000"),
+            ("lt1", "FFFFFF"),
+            ("dk2", "1B2631"),
+            ("lt2", "EAECEE"),
+            ("accent1", "1A5276"),
+            ("accent2", "922B21"),
+            ("accent3", "196F3D"),
+            ("accent4", "7D6608"),
+            ("accent5", "6C3483"),
+            ("accent6", "1B4F72"),
+            ("hlink", "1A5276"),
+            ("folHlink", "6C3483"),
+        ],
+        "Myriad Pro",
+        "Minion Pro",
     );
     // Two-column reference: justified + hyphenation are essential to avoid rivers.
-    apply_book_styles(doc, &BookStyle {
-        body_font: "Minion Pro", heading_font: "Myriad Pro",
-        body_pt: 10.0, line_spacing: 1.15, justified: true, heading_color: "1A5276",
-    });
+    apply_book_styles(
+        doc,
+        &BookStyle {
+            body_font: "Minion Pro",
+            heading_font: "Myriad Pro",
+            body_pt: 10.0,
+            line_spacing: 1.15,
+            justified: true,
+            heading_color: "1A5276",
+        },
+    );
 }
 
 pub fn create_kdp_manga(doc: &mut Document) {
     doc.set_page_size(Length::inches(5.0), Length::inches(7.5));
-    doc.set_margins(Length::inches(0.25), Length::inches(0.25), Length::inches(0.25), Length::inches(0.25));
+    doc.set_margins(
+        Length::inches(0.25),
+        Length::inches(0.25),
+        Length::inches(0.25),
+        Length::inches(0.25),
+    );
     doc.set_different_first_page(true);
     doc.set_title("Untitled Manga");
 }
@@ -310,23 +450,53 @@ pub fn create_kdp_manga(doc: &mut Document) {
 // ── Business / professional templates ────────────────────────────────────────
 
 /// US Letter page + a clean corporate theme. `accent` is the heading/brand hex.
-fn business_base(doc: &mut Document, f: &Fields, title: &str, accent: &str, heading_font: &str, body_font: &str) {
+fn business_base(
+    doc: &mut Document,
+    f: &Fields,
+    title: &str,
+    accent: &str,
+    heading_font: &str,
+    body_font: &str,
+) {
     let heading_font = f.get("heading_font", heading_font);
     let body_font = f.get("body_font", body_font);
     doc.set_page_size(Length::inches(8.5), Length::inches(11.0));
-    doc.set_margins(Length::inches(1.0), Length::inches(1.0), Length::inches(1.0), Length::inches(1.0));
+    doc.set_margins(
+        Length::inches(1.0),
+        Length::inches(1.0),
+        Length::inches(1.0),
+        Length::inches(1.0),
+    );
     doc.set_title(title);
     doc.set_theme(
-        &[("dk1","1A1A1A"),("lt1","FFFFFF"),("dk2","404040"),("lt2","F2F2F2"),
-          ("accent1",accent),("accent2","C0392B"),("accent3","27AE60"),
-          ("accent4","F39C12"),("accent5","8E44AD"),("accent6","16A085"),
-          ("hlink",accent),("folHlink","8E44AD")],
-        &heading_font, &body_font,
+        &[
+            ("dk1", "1A1A1A"),
+            ("lt1", "FFFFFF"),
+            ("dk2", "404040"),
+            ("lt2", "F2F2F2"),
+            ("accent1", accent),
+            ("accent2", "C0392B"),
+            ("accent3", "27AE60"),
+            ("accent4", "F39C12"),
+            ("accent5", "8E44AD"),
+            ("accent6", "16A085"),
+            ("hlink", accent),
+            ("folHlink", "8E44AD"),
+        ],
+        &heading_font,
+        &body_font,
     );
-    apply_book_styles(doc, &BookStyle {
-        body_font: &body_font, heading_font: &heading_font,
-        body_pt: 11.0, line_spacing: 1.15, justified: false, heading_color: accent,
-    });
+    apply_book_styles(
+        doc,
+        &BookStyle {
+            body_font: &body_font,
+            heading_font: &heading_font,
+            body_pt: 11.0,
+            line_spacing: 1.15,
+            justified: false,
+            heading_color: accent,
+        },
+    );
     render_logo(doc, f);
 }
 
@@ -337,12 +507,21 @@ fn heading(doc: &mut Document, level: u32, text: &str) {
 
 /// Set a table cell's text with alignment and optional bold, replacing the
 /// default empty paragraph so the alignment actually applies.
-fn cell_text(t: &mut zavora_docx::Table, row: usize, col: usize, text: &str, align: Alignment, bold: bool) {
+fn cell_text(
+    t: &mut zavora_docx::Table,
+    row: usize,
+    col: usize,
+    text: &str,
+    align: Alignment,
+    bold: bool,
+) {
     if let Some(mut c) = t.cell(row, col) {
         c.remove_first_empty_paragraph();
         let mut p = c.add_paragraph("").alignment(align);
         let r = p.add_run(text);
-        if bold { r.bold(true); }
+        if bold {
+            r.bold(true);
+        }
     }
 }
 
@@ -354,18 +533,26 @@ fn section_rule(doc: &mut Document, text: &str, accent: &str) {
         .add_paragraph("")
         .space_before(Length::pt(12.0))
         .space_after(Length::pt(4.0))
-        .border_bottom(BorderStyle::Single, 6, &accent);
-    p.add_run(text).bold(true).size(12.0).color(&accent).all_caps(true);
+        .border_bottom(BorderStyle::Single, 6, accent);
+    p.add_run(text)
+        .bold(true)
+        .size(12.0)
+        .color(accent)
+        .all_caps(true);
 }
 
 /// A two-part line: `left` left-aligned, `right` pushed to a right tab stop at
 /// `right_edge` inches — for "Title — Company .... Dates".
 fn dated_entry(doc: &mut Document, left: &str, left_bold: bool, right: &str, right_edge: f64) {
     use zavora_docx::TabAlignment;
-    let mut p = doc.add_paragraph("").add_tab_stop(TabAlignment::Right, Length::inches(right_edge));
+    let mut p = doc
+        .add_paragraph("")
+        .add_tab_stop(TabAlignment::Right, Length::inches(right_edge));
     {
         let l = p.add_run(left);
-        if left_bold { l.bold(true); }
+        if left_bold {
+            l.bold(true);
+        }
     }
     p.add_tab();
     p.add_run(right).italic(true);
@@ -375,20 +562,35 @@ fn dated_entry(doc: &mut Document, left: &str, left_bold: bool, right: &str, rig
 /// value or the placeholder; `f.arr("key")` yields a JSON array (or empty).
 pub struct Fields<'a>(&'a serde_json::Value);
 impl<'a> Fields<'a> {
-    pub fn new(v: &'a serde_json::Value) -> Self { Fields(v) }
+    pub fn new(v: &'a serde_json::Value) -> Self {
+        Fields(v)
+    }
     fn get(&self, key: &str, default: &str) -> String {
-        self.0.get(key).and_then(|v| v.as_str()).map(str::trim)
-            .filter(|s| !s.is_empty()).map(String::from)
+        self.0
+            .get(key)
+            .and_then(|v| v.as_str())
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+            .map(String::from)
             .unwrap_or_else(|| default.to_string())
     }
     fn arr(&self, key: &str) -> &'a [serde_json::Value] {
-        self.0.get(key).and_then(|v| v.as_array()).map(Vec::as_slice).unwrap_or(&[])
+        self.0
+            .get(key)
+            .and_then(|v| v.as_array())
+            .map(Vec::as_slice)
+            .unwrap_or(&[])
     }
     /// The brand accent color: a caller-supplied 6-digit hex in `data["accent"]`
     /// (with or without a leading '#'), else the template's `default`. Invalid
     /// values fall back to the default so a typo never breaks theming.
     fn accent(&self, default: &'static str) -> String {
-        match self.0.get("accent").and_then(|v| v.as_str()).map(|s| s.trim().trim_start_matches('#')) {
+        match self
+            .0
+            .get("accent")
+            .and_then(|v| v.as_str())
+            .map(|s| s.trim().trim_start_matches('#'))
+        {
             Some(h) if h.len() == 6 && h.bytes().all(|b| b.is_ascii_hexdigit()) => h.to_uppercase(),
             _ => default.to_string(),
         }
@@ -397,21 +599,34 @@ impl<'a> Fields<'a> {
 
 /// Read a string field off a JSON object, falling back to `default`.
 fn jstr<'a>(v: &'a serde_json::Value, key: &str, default: &'a str) -> &'a str {
-    v.get(key).and_then(|x| x.as_str()).map(str::trim).filter(|s| !s.is_empty()).unwrap_or(default)
+    v.get(key)
+        .and_then(|x| x.as_str())
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .unwrap_or(default)
 }
 
 /// Format a currency amount with thousands separators: 12345.5 -> "$12,345.50".
 fn money(v: f64) -> String {
     let s = format!("{:.2}", v.abs());
     let (int, frac) = s.split_once('.').unwrap_or((&s, "00"));
-    let grouped: String = int.as_bytes().rchunks(3).rev()
-        .map(|c| std::str::from_utf8(c).unwrap()).collect::<Vec<_>>().join(",");
+    let grouped: String = int
+        .as_bytes()
+        .rchunks(3)
+        .rev()
+        .map(|c| std::str::from_utf8(c).unwrap())
+        .collect::<Vec<_>>()
+        .join(",");
     format!("{}${}.{}", if v < 0.0 { "-" } else { "" }, grouped, frac)
 }
 
 /// Show whole quantities as integers, fractional ones as-is.
 fn fmt_qty(q: f64) -> String {
-    if q.fract() == 0.0 { format!("{}", q as i64) } else { format!("{}", q) }
+    if q.fract() == 0.0 {
+        format!("{}", q as i64)
+    } else {
+        format!("{}", q)
+    }
 }
 
 /// Read pixel dimensions from PNG or JPEG header bytes (no image crate dep).
@@ -424,7 +639,10 @@ fn image_dims(data: &[u8]) -> Option<(u32, u32)> {
     if data.len() > 4 && data[0] == 0xFF && data[1] == 0xD8 {
         let mut i = 2;
         while i + 9 < data.len() {
-            if data[i] != 0xFF { i += 1; continue; }
+            if data[i] != 0xFF {
+                i += 1;
+                continue;
+            }
             let m = data[i + 1];
             if (0xC0..=0xCF).contains(&m) && m != 0xC4 && m != 0xC8 && m != 0xCC {
                 let h = u16::from_be_bytes([data[i + 5], data[i + 6]]) as u32;
@@ -440,10 +658,14 @@ fn image_dims(data: &[u8]) -> Option<(u32, u32)> {
 /// Read a logo image file and return (bytes, filename, aspect = w/h). None if
 /// the path is empty or unreadable / not a recognized image.
 fn load_logo(path: &str) -> Option<(Vec<u8>, String, f64)> {
-    if path.is_empty() { return None; }
+    if path.is_empty() {
+        return None;
+    }
     let data = std::fs::read(path).ok()?;
     let (w, h) = image_dims(&data)?;
-    if h == 0 { return None; }
+    if h == 0 {
+        return None;
+    }
     let ext = path.rsplit('.').next().unwrap_or("png");
     Some((data, format!("logo.{ext}"), w as f64 / h as f64))
 }
@@ -454,7 +676,11 @@ fn load_logo(path: &str) -> Option<(Vec<u8>, String, f64)> {
 /// when absent/unreadable, so every template accepts a logo at zero cost.
 fn render_logo(doc: &mut Document, f: &Fields) {
     if let Some((data, name, aspect)) = load_logo(&f.get("logo", "")) {
-        let h = f.get("logo_height", "0.6").parse::<f64>().unwrap_or(0.6).clamp(0.2, 3.0);
+        let h = f
+            .get("logo_height", "0.6")
+            .parse::<f64>()
+            .unwrap_or(0.6)
+            .clamp(0.2, 3.0);
         let align = match f.get("logo_align", "center").as_str() {
             "left" => Alignment::Left,
             "right" => Alignment::Right,
@@ -472,10 +698,16 @@ fn priced_items_table(doc: &mut Document, f: &Fields, accent: &str, total_label:
     use zavora_docx::BorderStyle;
     let items = f.arr("items");
     let n = items.len().max(4);
-    let mut t = doc.add_table(n + 2, 4)
+    let mut t = doc
+        .add_table(n + 2, 4)
         .borders(BorderStyle::Single, 4, "D0D0D0")
-        .column_widths(&[Length::inches(3.4), Length::inches(0.8), Length::inches(1.2), Length::inches(1.2)]);
-    t.header_row_style(&accent, "FFFFFF");
+        .column_widths(&[
+            Length::inches(3.4),
+            Length::inches(0.8),
+            Length::inches(1.2),
+            Length::inches(1.2),
+        ]);
+    t.header_row_style(accent, "FFFFFF");
     cell_text(&mut t, 0, 0, "Description", Alignment::Left, true);
     cell_text(&mut t, 0, 1, "Qty", Alignment::Center, true);
     cell_text(&mut t, 0, 2, "Unit Price", Alignment::Right, true);
@@ -486,15 +718,32 @@ fn priced_items_table(doc: &mut Document, f: &Fields, accent: &str, total_label:
             Some(it) => {
                 let qty = it.get("qty").and_then(|v| v.as_f64()).unwrap_or(1.0);
                 let price = it.get("price").and_then(|v| v.as_f64()).unwrap_or(0.0);
-                let amount = it.get("amount").and_then(|v| v.as_f64()).unwrap_or(qty * price);
+                let amount = it
+                    .get("amount")
+                    .and_then(|v| v.as_f64())
+                    .unwrap_or(qty * price);
                 total += amount;
-                cell_text(&mut t, r, 0, jstr(it, "description", "[Item or service description]"), Alignment::Left, false);
+                cell_text(
+                    &mut t,
+                    r,
+                    0,
+                    jstr(it, "description", "[Item or service description]"),
+                    Alignment::Left,
+                    false,
+                );
                 cell_text(&mut t, r, 1, &fmt_qty(qty), Alignment::Center, false);
                 cell_text(&mut t, r, 2, &money(price), Alignment::Right, false);
                 cell_text(&mut t, r, 3, &money(amount), Alignment::Right, false);
             }
             None => {
-                cell_text(&mut t, r, 0, "[Item or service description]", Alignment::Left, false);
+                cell_text(
+                    &mut t,
+                    r,
+                    0,
+                    "[Item or service description]",
+                    Alignment::Left,
+                    false,
+                );
                 cell_text(&mut t, r, 1, "1", Alignment::Center, false);
                 cell_text(&mut t, r, 2, "$0.00", Alignment::Right, false);
                 cell_text(&mut t, r, 3, "$0.00", Alignment::Right, false);
@@ -503,10 +752,23 @@ fn priced_items_table(doc: &mut Document, f: &Fields, accent: &str, total_label:
     }
     let tr = n + 1;
     for col in 0..4 {
-        if let Some(c) = t.cell(tr, col) { c.shading("EFEFEF"); }
+        if let Some(c) = t.cell(tr, col) {
+            c.shading("EFEFEF");
+        }
     }
     cell_text(&mut t, tr, 2, total_label, Alignment::Right, true);
-    cell_text(&mut t, tr, 3, &if items.is_empty() { "$0.00".into() } else { money(total) }, Alignment::Right, true);
+    cell_text(
+        &mut t,
+        tr,
+        3,
+        &if items.is_empty() {
+            "$0.00".into()
+        } else {
+            money(total)
+        },
+        Alignment::Right,
+        true,
+    );
 }
 
 /// Business report: title page-style header, sections scaffold, page numbers.
@@ -514,12 +776,23 @@ pub fn create_business_report(doc: &mut Document, f: &Fields) {
     let accent = f.accent("2980B9");
     business_base(doc, f, "Business Report", &accent, "Calibri", "Cambria");
     doc.set_footer_page_number();
-    doc.add_paragraph(&f.get("title", "BUSINESS REPORT").to_uppercase()).style("Heading1").alignment(Alignment::Center);
-    doc.add_paragraph(&f.get("subtitle", "Subtitle / Reporting Period")).alignment(Alignment::Center);
-    doc.add_paragraph(&format!("Prepared by: {} · {}", f.get("author", "[Author]"), f.get("date", "[Date]"))).alignment(Alignment::Center);
+    doc.add_paragraph(&f.get("title", "BUSINESS REPORT").to_uppercase())
+        .style("Heading1")
+        .alignment(Alignment::Center);
+    doc.add_paragraph(&f.get("subtitle", "Subtitle / Reporting Period"))
+        .alignment(Alignment::Center);
+    doc.add_paragraph(&format!(
+        "Prepared by: {} · {}",
+        f.get("author", "[Author]"),
+        f.get("date", "[Date]")
+    ))
+    .alignment(Alignment::Center);
     doc.add_paragraph("");
     section_rule(doc, "Executive Summary", &accent);
-    doc.add_paragraph(&f.get("summary", "[Summarize the report's key findings and recommendations.]"));
+    doc.add_paragraph(&f.get(
+        "summary",
+        "[Summarize the report's key findings and recommendations.]",
+    ));
     section_rule(doc, "Introduction", &accent);
     doc.add_paragraph(&f.get("introduction", "[Background and objectives.]"));
     section_rule(doc, "Findings", &accent);
@@ -535,32 +808,65 @@ pub fn create_business_report(doc: &mut Document, f: &Fields) {
 pub fn create_resume(doc: &mut Document, f: &Fields) {
     let accent = f.accent("1F3A5F");
     business_base(doc, f, "Resume", &accent, "Calibri", "Calibri");
-    doc.set_margins(Length::inches(0.75), Length::inches(0.75), Length::inches(0.75), Length::inches(0.75));
+    doc.set_margins(
+        Length::inches(0.75),
+        Length::inches(0.75),
+        Length::inches(0.75),
+        Length::inches(0.75),
+    );
     let edge = 7.0; // 8.5" - 2×0.75" printable width
 
-    doc.add_paragraph(&f.get("name", "YOUR NAME").to_uppercase()).style("Heading1").alignment(Alignment::Center);
-    doc.add_paragraph(&f.get("contact", "City, State · email@example.com · (555) 555-5555 · linkedin.com/in/you"))
+    doc.add_paragraph(&f.get("name", "YOUR NAME").to_uppercase())
+        .style("Heading1")
         .alignment(Alignment::Center);
+    doc.add_paragraph(&f.get(
+        "contact",
+        "City, State · email@example.com · (555) 555-5555 · linkedin.com/in/you",
+    ))
+    .alignment(Alignment::Center);
 
     section_rule(doc, "Professional Summary", &accent);
-    doc.add_paragraph(&f.get("summary", "[2-3 sentence summary of your experience, strengths, and target role.]"));
+    doc.add_paragraph(&f.get(
+        "summary",
+        "[2-3 sentence summary of your experience, strengths, and target role.]",
+    ));
 
     section_rule(doc, "Experience", &accent);
     let exp = f.arr("experience");
     if exp.is_empty() {
         dated_entry(doc, "Job Title — Company", true, "[Start – End]", edge);
-        { doc.add_paragraph("").add_run("[City, State]").italic(true); }
-        doc.add_bullet_list_item("[Accomplishment with a measurable result — e.g. grew X by 30%.]", 0);
+        {
+            doc.add_paragraph("").add_run("[City, State]").italic(true);
+        }
+        doc.add_bullet_list_item(
+            "[Accomplishment with a measurable result — e.g. grew X by 30%.]",
+            0,
+        );
         doc.add_bullet_list_item("[Accomplishment demonstrating ownership and impact.]", 0);
         dated_entry(doc, "Previous Title — Company", true, "[Start – End]", edge);
         doc.add_bullet_list_item("[Key contribution or initiative led.]", 0);
     } else {
         for e in exp {
-            dated_entry(doc, jstr(e, "title", "Job Title — Company"), true, jstr(e, "dates", ""), edge);
+            dated_entry(
+                doc,
+                jstr(e, "title", "Job Title — Company"),
+                true,
+                jstr(e, "dates", ""),
+                edge,
+            );
             let loc = jstr(e, "location", "");
-            if !loc.is_empty() { doc.add_paragraph("").add_run(loc).italic(true); }
-            for b in e.get("bullets").and_then(|v| v.as_array()).map(Vec::as_slice).unwrap_or(&[]) {
-                if let Some(s) = b.as_str() { doc.add_bullet_list_item(s, 0); }
+            if !loc.is_empty() {
+                doc.add_paragraph("").add_run(loc).italic(true);
+            }
+            for b in e
+                .get("bullets")
+                .and_then(|v| v.as_array())
+                .map(Vec::as_slice)
+                .unwrap_or(&[])
+            {
+                if let Some(s) = b.as_str() {
+                    doc.add_bullet_list_item(s, 0);
+                }
             }
         }
     }
@@ -571,12 +877,21 @@ pub fn create_resume(doc: &mut Document, f: &Fields) {
         dated_entry(doc, "Degree, Institution", true, "[Year]", edge);
     } else {
         for e in edu {
-            dated_entry(doc, jstr(e, "degree", "Degree, Institution"), true, jstr(e, "year", ""), edge);
+            dated_entry(
+                doc,
+                jstr(e, "degree", "Degree, Institution"),
+                true,
+                jstr(e, "year", ""),
+                edge,
+            );
         }
     }
 
     section_rule(doc, "Skills", &accent);
-    doc.add_paragraph(&f.get("skills", "[Skill] · [Skill] · [Skill] · [Skill] · [Skill] · [Skill]"));
+    doc.add_paragraph(&f.get(
+        "skills",
+        "[Skill] · [Skill] · [Skill] · [Skill] · [Skill] · [Skill]",
+    ));
 }
 
 /// Business letter: block format with sender/recipient/date/salutation/body/closing.
@@ -597,7 +912,10 @@ pub fn create_letter(doc: &mut Document, f: &Fields) {
     doc.add_paragraph("");
     doc.add_paragraph(&f.get("opening", "[Opening paragraph — state your purpose.]"));
     doc.add_paragraph(&f.get("body", "[Body paragraph — provide detail and context.]"));
-    doc.add_paragraph(&f.get("closing", "[Closing paragraph — call to action / next steps.]"));
+    doc.add_paragraph(&f.get(
+        "closing",
+        "[Closing paragraph — call to action / next steps.]",
+    ));
     doc.add_paragraph("");
     doc.add_paragraph(&f.get("sign_off", "Sincerely,"));
     doc.add_paragraph("");
@@ -609,7 +927,8 @@ pub fn create_memo(doc: &mut Document, f: &Fields) {
     let accent = f.accent("404040");
     business_base(doc, f, "Memo", &accent, "Calibri", "Calibri");
     section_rule(doc, "Memorandum", &accent);
-    let mut t = doc.add_table(4, 2)
+    let mut t = doc
+        .add_table(4, 2)
         .column_widths(&[Length::inches(1.0), Length::inches(5.5)]);
     let vals = [
         ("TO:", f.get("to", "[ ... ]")),
@@ -623,7 +942,10 @@ pub fn create_memo(doc: &mut Document, f: &Fields) {
     }
     doc.add_paragraph("");
     doc.add_paragraph(&f.get("purpose", "[Purpose of the memo in one line.]"));
-    doc.add_paragraph(&f.get("body", "[Body — context, details, and any action required.]"));
+    doc.add_paragraph(&f.get(
+        "body",
+        "[Body — context, details, and any action required.]",
+    ));
     doc.add_paragraph(&f.get("closing", "[Closing — deadlines or contact for questions.]"));
 }
 
@@ -636,16 +958,27 @@ pub fn create_invoice(doc: &mut Document, f: &Fields) {
     // Masthead: company on the left, big INVOICE wordmark established by Heading1.
     {
         let mut p = doc.add_paragraph("");
-        p.add_run(&f.get("company", "[Your Company]")).bold(true).size(15.0).color(&accent);
+        p.add_run(&f.get("company", "[Your Company]"))
+            .bold(true)
+            .size(15.0)
+            .color(&accent);
     }
-    doc.add_paragraph(&f.get("company_details", "[Street Address · City, State ZIP · email@company.com · (555) 555-5555]"));
+    doc.add_paragraph(&f.get(
+        "company_details",
+        "[Street Address · City, State ZIP · email@company.com · (555) 555-5555]",
+    ));
     doc.add_paragraph("INVOICE").style("Heading1");
 
     // Meta block: a borderless 2-col table puts label/value pairs on the right.
     {
-        let mut m = doc.add_table(3, 2)
+        let mut m = doc
+            .add_table(3, 2)
             .column_widths(&[Length::inches(1.2), Length::inches(2.0)]);
-        let meta = [("Invoice #", f.get("number", "[0001]")), ("Date", f.get("date", "[Date]")), ("Due", f.get("due", "[Date]"))];
+        let meta = [
+            ("Invoice #", f.get("number", "[0001]")),
+            ("Date", f.get("date", "[Date]")),
+            ("Due", f.get("due", "[Date]")),
+        ];
         for (i, (k, v)) in meta.iter().enumerate() {
             cell_text(&mut m, i, 0, k, Alignment::Left, true);
             cell_text(&mut m, i, 1, v, Alignment::Left, false);
@@ -665,7 +998,10 @@ pub fn create_invoice(doc: &mut Document, f: &Fields) {
     {
         let mut p = doc.add_paragraph("");
         p.add_run("Payment terms: ").bold(true);
-        p.add_run(&f.get("terms", "Net 30. Make checks payable to [Your Company]. Thank you for your business."));
+        p.add_run(&f.get(
+            "terms",
+            "Net 30. Make checks payable to [Your Company]. Thank you for your business.",
+        ));
     }
 }
 
@@ -673,7 +1009,9 @@ pub fn create_invoice(doc: &mut Document, f: &Fields) {
 pub fn create_newsletter(doc: &mut Document, f: &Fields) {
     let accent = f.accent("6C3483");
     business_base(doc, f, "Newsletter", &accent, "Calibri", "Georgia");
-    doc.add_paragraph(&f.get("title", "THE NEWSLETTER").to_uppercase()).style("Heading1").alignment(Alignment::Center);
+    doc.add_paragraph(&f.get("title", "THE NEWSLETTER").to_uppercase())
+        .style("Heading1")
+        .alignment(Alignment::Center);
     {
         use zavora_docx::BorderStyle;
         doc.add_paragraph("")
@@ -684,7 +1022,10 @@ pub fn create_newsletter(doc: &mut Document, f: &Fields) {
     doc.add_paragraph("");
     doc.set_columns(2, Length::inches(0.3));
     section_rule(doc, "Lead Story", &accent);
-    doc.add_paragraph(&f.get("lead", "[Open with the most important news for your readers.]"));
+    doc.add_paragraph(&f.get(
+        "lead",
+        "[Open with the most important news for your readers.]",
+    ));
     section_rule(doc, "In This Issue", &accent);
     doc.add_paragraph(&f.get("secondary", "[Secondary article or announcements.]"));
     section_rule(doc, "Upcoming Events", &accent);
@@ -694,20 +1035,41 @@ pub fn create_newsletter(doc: &mut Document, f: &Fields) {
 /// Academic paper: title block, abstract, numbered sections, references.
 pub fn create_academic(doc: &mut Document, f: &Fields) {
     let accent = f.accent("1A1A1A");
-    business_base(doc, f, "Academic Paper", &accent, "Times New Roman", "Times New Roman");
-    apply_book_styles(doc, &BookStyle {
-        body_font: "Times New Roman", heading_font: "Times New Roman",
-        body_pt: 12.0, line_spacing: 2.0, justified: false, heading_color: "1A1A1A",
-    });
+    business_base(
+        doc,
+        f,
+        "Academic Paper",
+        &accent,
+        "Times New Roman",
+        "Times New Roman",
+    );
+    apply_book_styles(
+        doc,
+        &BookStyle {
+            body_font: "Times New Roman",
+            heading_font: "Times New Roman",
+            body_pt: 12.0,
+            line_spacing: 2.0,
+            justified: false,
+            heading_color: "1A1A1A",
+        },
+    );
     doc.set_footer_page_number();
-    doc.add_paragraph(&f.get("title", "Paper Title")).style("Heading1").alignment(Alignment::Center);
-    doc.add_paragraph(&f.get("author", "Author Name")).alignment(Alignment::Center);
-    doc.add_paragraph(&f.get("affiliation", "Institution / Affiliation")).alignment(Alignment::Center);
+    doc.add_paragraph(&f.get("title", "Paper Title"))
+        .style("Heading1")
+        .alignment(Alignment::Center);
+    doc.add_paragraph(&f.get("author", "Author Name"))
+        .alignment(Alignment::Center);
+    doc.add_paragraph(&f.get("affiliation", "Institution / Affiliation"))
+        .alignment(Alignment::Center);
     doc.add_paragraph("");
     heading(doc, 2, "Abstract");
     doc.add_paragraph(&f.get("abstract", "[150-250 word summary of the research.]"));
     heading(doc, 2, "1. Introduction");
-    doc.add_paragraph(&f.get("introduction", "[Problem statement, motivation, and contributions.]"));
+    doc.add_paragraph(&f.get(
+        "introduction",
+        "[Problem statement, motivation, and contributions.]",
+    ));
     heading(doc, 2, "2. Methods");
     doc.add_paragraph(&f.get("methods", "[Describe your approach and materials.]"));
     heading(doc, 2, "3. Results");
@@ -725,21 +1087,40 @@ pub fn create_proposal(doc: &mut Document, f: &Fields) {
     let accent = f.accent("B9770E");
     business_base(doc, f, "Proposal", &accent, "Calibri", "Cambria");
     doc.set_footer_page_number();
-    doc.add_paragraph(&f.get("title", "PROJECT PROPOSAL").to_uppercase()).style("Heading1").alignment(Alignment::Center);
-    doc.add_paragraph(&format!("Prepared for {} · by {}", f.get("client", "[Client]"), f.get("author", "[Your Company]"))).alignment(Alignment::Center);
-    doc.add_paragraph(&f.get("date", "[Date]")).alignment(Alignment::Center);
+    doc.add_paragraph(&f.get("title", "PROJECT PROPOSAL").to_uppercase())
+        .style("Heading1")
+        .alignment(Alignment::Center);
+    doc.add_paragraph(&format!(
+        "Prepared for {} · by {}",
+        f.get("client", "[Client]"),
+        f.get("author", "[Your Company]")
+    ))
+    .alignment(Alignment::Center);
+    doc.add_paragraph(&f.get("date", "[Date]"))
+        .alignment(Alignment::Center);
     section_rule(doc, "Overview", &accent);
-    doc.add_paragraph(&f.get("overview", "[Summarize the problem and your proposed solution.]"));
+    doc.add_paragraph(&f.get(
+        "overview",
+        "[Summarize the problem and your proposed solution.]",
+    ));
     section_rule(doc, "Scope of Work", &accent);
-    doc.add_paragraph(&f.get("scope", "[Describe deliverables, approach, and boundaries.]"));
+    doc.add_paragraph(&f.get(
+        "scope",
+        "[Describe deliverables, approach, and boundaries.]",
+    ));
     section_rule(doc, "Timeline", &accent);
     doc.add_paragraph(&f.get("timeline", "[Phases, milestones, and dates.]"));
     section_rule(doc, "Investment", &accent);
     let items = f.arr("items");
     let n = items.len().max(3);
-    let mut t = doc.add_table(n + 2, 3)
+    let mut t = doc
+        .add_table(n + 2, 3)
         .borders(BorderStyle::Single, 4, "D0D0D0")
-        .column_widths(&[Length::inches(4.2), Length::inches(1.0), Length::inches(1.3)]);
+        .column_widths(&[
+            Length::inches(4.2),
+            Length::inches(1.0),
+            Length::inches(1.3),
+        ]);
     t.header_row_style(&accent, "FFFFFF");
     cell_text(&mut t, 0, 0, "Deliverable", Alignment::Left, true);
     cell_text(&mut t, 0, 1, "Qty", Alignment::Center, true);
@@ -750,9 +1131,19 @@ pub fn create_proposal(doc: &mut Document, f: &Fields) {
             Some(it) => {
                 let qty = it.get("qty").and_then(|v| v.as_f64()).unwrap_or(1.0);
                 let price = it.get("price").and_then(|v| v.as_f64()).unwrap_or(0.0);
-                let amount = it.get("amount").and_then(|v| v.as_f64()).unwrap_or(qty * price);
+                let amount = it
+                    .get("amount")
+                    .and_then(|v| v.as_f64())
+                    .unwrap_or(qty * price);
                 total += amount;
-                cell_text(&mut t, r, 0, jstr(it, "description", "[Deliverable]"), Alignment::Left, false);
+                cell_text(
+                    &mut t,
+                    r,
+                    0,
+                    jstr(it, "description", "[Deliverable]"),
+                    Alignment::Left,
+                    false,
+                );
                 cell_text(&mut t, r, 1, &fmt_qty(qty), Alignment::Center, false);
                 cell_text(&mut t, r, 2, &money(amount), Alignment::Right, false);
             }
@@ -765,10 +1156,23 @@ pub fn create_proposal(doc: &mut Document, f: &Fields) {
     }
     let tr = n + 1;
     for col in 0..3 {
-        if let Some(c) = t.cell(tr, col) { c.shading("EFEFEF"); }
+        if let Some(c) = t.cell(tr, col) {
+            c.shading("EFEFEF");
+        }
     }
     cell_text(&mut t, tr, 1, "TOTAL", Alignment::Right, true);
-    cell_text(&mut t, tr, 2, &if items.is_empty() { "$0.00".into() } else { money(total) }, Alignment::Right, true);
+    cell_text(
+        &mut t,
+        tr,
+        2,
+        &if items.is_empty() {
+            "$0.00".into()
+        } else {
+            money(total)
+        },
+        Alignment::Right,
+        true,
+    );
     section_rule(doc, "Acceptance", &accent);
     doc.add_paragraph(&f.get("acceptance", "[Signature, date, and terms of acceptance.]"));
 }
@@ -777,12 +1181,24 @@ pub fn create_proposal(doc: &mut Document, f: &Fields) {
 pub fn create_agenda(doc: &mut Document, f: &Fields) {
     let accent = f.accent("2C3E50");
     business_base(doc, f, "Agenda", &accent, "Calibri", "Calibri");
-    doc.set_margins(Length::inches(0.75), Length::inches(0.75), Length::inches(0.75), Length::inches(0.75));
+    doc.set_margins(
+        Length::inches(0.75),
+        Length::inches(0.75),
+        Length::inches(0.75),
+        Length::inches(0.75),
+    );
     let edge = 7.0;
-    doc.add_paragraph(&f.get("title", "MEETING AGENDA").to_uppercase()).style("Heading1").alignment(Alignment::Center);
-    let mut t = doc.add_table(3, 2)
+    doc.add_paragraph(&f.get("title", "MEETING AGENDA").to_uppercase())
+        .style("Heading1")
+        .alignment(Alignment::Center);
+    let mut t = doc
+        .add_table(3, 2)
         .column_widths(&[Length::inches(1.2), Length::inches(5.3)]);
-    let meta = [("Date", f.get("date", "[Date]")), ("Time", f.get("time", "[Time]")), ("Location", f.get("location", "[Location]"))];
+    let meta = [
+        ("Date", f.get("date", "[Date]")),
+        ("Time", f.get("time", "[Time]")),
+        ("Location", f.get("location", "[Location]")),
+    ];
     for (i, (k, v)) in meta.iter().enumerate() {
         cell_text(&mut t, i, 0, k, Alignment::Left, true);
         cell_text(&mut t, i, 1, v, Alignment::Left, false);
@@ -796,9 +1212,17 @@ pub fn create_agenda(doc: &mut Document, f: &Fields) {
         }
     } else {
         for it in items {
-            dated_entry(doc, jstr(it, "topic", "[Topic]"), true, jstr(it, "duration", ""), edge);
+            dated_entry(
+                doc,
+                jstr(it, "topic", "[Topic]"),
+                true,
+                jstr(it, "duration", ""),
+                edge,
+            );
             let owner = jstr(it, "owner", "");
-            if !owner.is_empty() { doc.add_paragraph("").add_run(owner).italic(true); }
+            if !owner.is_empty() {
+                doc.add_paragraph("").add_run(owner).italic(true);
+            }
         }
     }
     section_rule(doc, "Notes", &accent);
@@ -812,23 +1236,34 @@ pub fn create_press_release(doc: &mut Document, f: &Fields) {
     business_base(doc, f, "Press Release", &accent, "Arial", "Georgia");
     {
         let mut p = doc.add_paragraph("");
-        p.add_run(&f.get("status", "FOR IMMEDIATE RELEASE")).bold(true).all_caps(true).color(&accent);
+        p.add_run(&f.get("status", "FOR IMMEDIATE RELEASE"))
+            .bold(true)
+            .all_caps(true)
+            .color(&accent);
     }
     doc.add_paragraph("");
-    doc.add_paragraph(&f.get("headline", "Headline Goes Here")).style("Heading1").alignment(Alignment::Center);
+    doc.add_paragraph(&f.get("headline", "Headline Goes Here"))
+        .style("Heading1")
+        .alignment(Alignment::Center);
     {
         let mut p = doc.add_paragraph("").alignment(Alignment::Center);
-        p.add_run(&f.get("subhead", "[Optional subheadline]")).italic(true);
+        p.add_run(&f.get("subhead", "[Optional subheadline]"))
+            .italic(true);
     }
     doc.add_paragraph("");
     {
         let mut p = doc.add_paragraph("");
-        p.add_run(&format!("{} — ", f.get("dateline", "CITY, State, [Date]"))).bold(true);
+        p.add_run(&format!("{} — ", f.get("dateline", "CITY, State, [Date]")))
+            .bold(true);
         p.add_run(&f.get("body", "[Lead paragraph — the who/what/when/where/why.]"));
     }
     doc.add_paragraph(&f.get("body2", "[Supporting detail, quote, and context.]"));
     doc.add_paragraph("");
-    section_rule(doc, &format!("About {}", f.get("organization", "")), &accent);
+    section_rule(
+        doc,
+        &format!("About {}", f.get("organization", "")),
+        &accent,
+    );
     doc.add_paragraph(&f.get("boilerplate", "[One paragraph about your organization.]"));
     {
         let mut p = doc.add_paragraph("");
@@ -845,29 +1280,57 @@ pub fn create_certificate(doc: &mut Document, f: &Fields) {
     let accent = f.accent("8A6D1F");
     business_base(doc, f, "Certificate", &accent, "Georgia", "Georgia");
     doc.set_landscape();
-    for _ in 0..2 { doc.add_paragraph(""); }
-    doc.add_paragraph(&f.get("title", "Certificate of Achievement")).style("Heading1").alignment(Alignment::Center);
+    for _ in 0..2 {
+        doc.add_paragraph("");
+    }
+    doc.add_paragraph(&f.get("title", "Certificate of Achievement"))
+        .style("Heading1")
+        .alignment(Alignment::Center);
     {
         let mut p = doc.add_paragraph("").alignment(Alignment::Center);
-        p.add_run(&f.get("presented", "This certificate is proudly presented to")).italic(true).size(13.0);
+        p.add_run(&f.get("presented", "This certificate is proudly presented to"))
+            .italic(true)
+            .size(13.0);
     }
     doc.add_paragraph("");
     {
-        let mut p = doc.add_paragraph("")
+        let mut p = doc
+            .add_paragraph("")
             .alignment(Alignment::Center)
             .border_bottom(BorderStyle::Single, 6, &accent);
-        p.add_run(&f.get("recipient", "Recipient Name")).bold(true).size(30.0).color(&accent);
+        p.add_run(&f.get("recipient", "Recipient Name"))
+            .bold(true)
+            .size(30.0)
+            .color(&accent);
     }
     doc.add_paragraph("");
     {
         let mut p = doc.add_paragraph("").alignment(Alignment::Center);
-        p.add_run(&f.get("reason", "in recognition of outstanding achievement.")).size(13.0);
+        p.add_run(&f.get("reason", "in recognition of outstanding achievement."))
+            .size(13.0);
     }
-    for _ in 0..2 { doc.add_paragraph(""); }
-    let mut t = doc.add_table(2, 2)
+    for _ in 0..2 {
+        doc.add_paragraph("");
+    }
+    let mut t = doc
+        .add_table(2, 2)
         .column_widths(&[Length::inches(4.0), Length::inches(4.0)]);
-    cell_text(&mut t, 0, 0, f.get("date", "[Date]").as_str(), Alignment::Center, false);
-    cell_text(&mut t, 0, 1, f.get("signature", "[Signature]").as_str(), Alignment::Center, false);
+    cell_text(
+        &mut t,
+        0,
+        0,
+        f.get("date", "[Date]").as_str(),
+        Alignment::Center,
+        false,
+    );
+    cell_text(
+        &mut t,
+        0,
+        1,
+        f.get("signature", "[Signature]").as_str(),
+        Alignment::Center,
+        false,
+    );
     cell_text(&mut t, 1, 0, "Date", Alignment::Center, true);
     cell_text(&mut t, 1, 1, "Authorized by", Alignment::Center, true);
 }
@@ -886,8 +1349,14 @@ pub fn create_cover_letter(doc: &mut Document, f: &Fields) {
     doc.add_paragraph("");
     doc.add_paragraph(&format!("Dear {},", f.get("salutation", "Hiring Manager")));
     doc.add_paragraph("");
-    doc.add_paragraph(&f.get("opening", "[State the role you're applying for and a one-line hook.]"));
-    doc.add_paragraph(&f.get("body", "[Why you're a fit — relevant achievements and skills.]"));
+    doc.add_paragraph(&f.get(
+        "opening",
+        "[State the role you're applying for and a one-line hook.]",
+    ));
+    doc.add_paragraph(&f.get(
+        "body",
+        "[Why you're a fit — relevant achievements and skills.]",
+    ));
     doc.add_paragraph(&f.get("closing", "[Reiterate interest and invite next steps.]"));
     doc.add_paragraph("");
     doc.add_paragraph("Sincerely,");
@@ -900,12 +1369,16 @@ pub fn create_fax_cover(doc: &mut Document, f: &Fields) {
     let accent = f.accent("404040");
     business_base(doc, f, "Fax", &accent, "Calibri", "Calibri");
     section_rule(doc, "Fax", &accent);
-    let mut t = doc.add_table(6, 2)
+    let mut t = doc
+        .add_table(6, 2)
         .column_widths(&[Length::inches(1.2), Length::inches(5.3)]);
     let rows = [
-        ("TO:", f.get("to", "[ ... ]")), ("FROM:", f.get("from", "[ ... ]")),
-        ("FAX:", f.get("fax", "[ ... ]")), ("PHONE:", f.get("phone", "[ ... ]")),
-        ("DATE:", f.get("date", "[ ... ]")), ("PAGES:", f.get("pages", "[ ... ]")),
+        ("TO:", f.get("to", "[ ... ]")),
+        ("FROM:", f.get("from", "[ ... ]")),
+        ("FAX:", f.get("fax", "[ ... ]")),
+        ("PHONE:", f.get("phone", "[ ... ]")),
+        ("DATE:", f.get("date", "[ ... ]")),
+        ("PAGES:", f.get("pages", "[ ... ]")),
     ];
     for (i, (k, v)) in rows.iter().enumerate() {
         cell_text(&mut t, i, 0, k, Alignment::Left, true);
@@ -921,25 +1394,41 @@ pub fn create_quote(doc: &mut Document, f: &Fields) {
     business_base(doc, f, "Quote", &accent, "Calibri", "Calibri");
     {
         let mut p = doc.add_paragraph("");
-        p.add_run(&f.get("company", "[Your Company]")).bold(true).size(15.0).color(&accent);
+        p.add_run(&f.get("company", "[Your Company]"))
+            .bold(true)
+            .size(15.0)
+            .color(&accent);
     }
     doc.add_paragraph(&f.get("company_details", "[Address · email · phone]"));
     doc.add_paragraph("QUOTE").style("Heading1");
     {
-        let mut m = doc.add_table(3, 2).column_widths(&[Length::inches(1.2), Length::inches(2.0)]);
-        let meta = [("Quote #", f.get("number", "[0001]")), ("Date", f.get("date", "[Date]")), ("Valid until", f.get("valid_until", "[Date]"))];
+        let mut m = doc
+            .add_table(3, 2)
+            .column_widths(&[Length::inches(1.2), Length::inches(2.0)]);
+        let meta = [
+            ("Quote #", f.get("number", "[0001]")),
+            ("Date", f.get("date", "[Date]")),
+            ("Valid until", f.get("valid_until", "[Date]")),
+        ];
         for (i, (k, v)) in meta.iter().enumerate() {
             cell_text(&mut m, i, 0, k, Alignment::Left, true);
             cell_text(&mut m, i, 1, v, Alignment::Left, false);
         }
     }
     doc.add_paragraph("");
-    { let mut p = doc.add_paragraph(""); p.add_run("Prepared For").bold(true).color(&accent); }
+    {
+        let mut p = doc.add_paragraph("");
+        p.add_run("Prepared For").bold(true).color(&accent);
+    }
     doc.add_paragraph(&f.get("client", "[Client · Company · Address]"));
     doc.add_paragraph("");
     priced_items_table(doc, f, &accent, "TOTAL");
     doc.add_paragraph("");
-    { let mut p = doc.add_paragraph(""); p.add_run("Notes: ").bold(true); p.add_run(&f.get("notes", "Prices valid for 30 days. Taxes not included.")); }
+    {
+        let mut p = doc.add_paragraph("");
+        p.add_run("Notes: ").bold(true);
+        p.add_run(&f.get("notes", "Prices valid for 30 days. Taxes not included."));
+    }
 }
 
 /// Purchase order: vendor/ship-to blocks + priced items with a PO total.
@@ -948,26 +1437,47 @@ pub fn create_purchase_order(doc: &mut Document, f: &Fields) {
     business_base(doc, f, "Purchase Order", &accent, "Calibri", "Calibri");
     {
         let mut p = doc.add_paragraph("");
-        p.add_run(&f.get("company", "[Your Company]")).bold(true).size(15.0).color(&accent);
+        p.add_run(&f.get("company", "[Your Company]"))
+            .bold(true)
+            .size(15.0)
+            .color(&accent);
     }
     doc.add_paragraph("PURCHASE ORDER").style("Heading1");
     {
-        let mut m = doc.add_table(2, 2).column_widths(&[Length::inches(1.2), Length::inches(2.0)]);
-        let meta = [("PO #", f.get("number", "[0001]")), ("Date", f.get("date", "[Date]"))];
+        let mut m = doc
+            .add_table(2, 2)
+            .column_widths(&[Length::inches(1.2), Length::inches(2.0)]);
+        let meta = [
+            ("PO #", f.get("number", "[0001]")),
+            ("Date", f.get("date", "[Date]")),
+        ];
         for (i, (k, v)) in meta.iter().enumerate() {
             cell_text(&mut m, i, 0, k, Alignment::Left, true);
             cell_text(&mut m, i, 1, v, Alignment::Left, false);
         }
     }
     doc.add_paragraph("");
-    { let mut p = doc.add_paragraph(""); p.add_run("Vendor").bold(true).color(&accent); }
+    {
+        let mut p = doc.add_paragraph("");
+        p.add_run("Vendor").bold(true).color(&accent);
+    }
     doc.add_paragraph(&f.get("vendor", "[Vendor · Address]"));
-    { let mut p = doc.add_paragraph(""); p.add_run("Ship To").bold(true).color(&accent); }
+    {
+        let mut p = doc.add_paragraph("");
+        p.add_run("Ship To").bold(true).color(&accent);
+    }
     doc.add_paragraph(&f.get("ship_to", "[Recipient · Address]"));
     doc.add_paragraph("");
     priced_items_table(doc, f, &accent, "TOTAL");
     doc.add_paragraph("");
-    { let mut p = doc.add_paragraph(""); p.add_run("Terms: ").bold(true); p.add_run(&f.get("terms", "Deliver by [date]. Reference this PO number on all correspondence.")); }
+    {
+        let mut p = doc.add_paragraph("");
+        p.add_run("Terms: ").bold(true);
+        p.add_run(&f.get(
+            "terms",
+            "Deliver by [date]. Reference this PO number on all correspondence.",
+        ));
+    }
 }
 
 /// Payment receipt: receipt meta + priced items showing amount PAID.
@@ -976,83 +1486,179 @@ pub fn create_receipt(doc: &mut Document, f: &Fields) {
     business_base(doc, f, "Receipt", &accent, "Calibri", "Calibri");
     {
         let mut p = doc.add_paragraph("");
-        p.add_run(&f.get("company", "[Your Company]")).bold(true).size(15.0).color(&accent);
+        p.add_run(&f.get("company", "[Your Company]"))
+            .bold(true)
+            .size(15.0)
+            .color(&accent);
     }
     doc.add_paragraph("RECEIPT").style("Heading1");
     {
-        let mut m = doc.add_table(3, 2).column_widths(&[Length::inches(1.4), Length::inches(2.0)]);
-        let meta = [("Receipt #", f.get("number", "[0001]")), ("Date", f.get("date", "[Date]")), ("Method", f.get("method", "[Card / Cash]"))];
+        let mut m = doc
+            .add_table(3, 2)
+            .column_widths(&[Length::inches(1.4), Length::inches(2.0)]);
+        let meta = [
+            ("Receipt #", f.get("number", "[0001]")),
+            ("Date", f.get("date", "[Date]")),
+            ("Method", f.get("method", "[Card / Cash]")),
+        ];
         for (i, (k, v)) in meta.iter().enumerate() {
             cell_text(&mut m, i, 0, k, Alignment::Left, true);
             cell_text(&mut m, i, 1, v, Alignment::Left, false);
         }
     }
     doc.add_paragraph("");
-    { let mut p = doc.add_paragraph(""); p.add_run("Received From").bold(true).color(&accent); }
+    {
+        let mut p = doc.add_paragraph("");
+        p.add_run("Received From").bold(true).color(&accent);
+    }
     doc.add_paragraph(&f.get("payer", "[Payer name]"));
     doc.add_paragraph("");
     priced_items_table(doc, f, &accent, "PAID");
     doc.add_paragraph("");
-    doc.add_paragraph(&f.get("note", "Thank you for your payment.")).alignment(Alignment::Center);
+    doc.add_paragraph(&f.get("note", "Thank you for your payment."))
+        .alignment(Alignment::Center);
 }
 
 /// Event flyer: large centered headline, subhead, ruled details, and call-out.
 pub fn create_flyer(doc: &mut Document, f: &Fields) {
     let accent = f.accent("C0392B");
     business_base(doc, f, "Flyer", &accent, "Arial", "Arial");
-    for _ in 0..2 { doc.add_paragraph(""); }
-    doc.add_paragraph(&f.get("headline", "EVENT TITLE").to_uppercase()).style("Heading1").alignment(Alignment::Center);
-    { let mut p = doc.add_paragraph("").alignment(Alignment::Center); p.add_run(&f.get("subhead", "[Catchy one-liner]")).italic(true).size(15.0); }
+    for _ in 0..2 {
+        doc.add_paragraph("");
+    }
+    doc.add_paragraph(&f.get("headline", "EVENT TITLE").to_uppercase())
+        .style("Heading1")
+        .alignment(Alignment::Center);
+    {
+        let mut p = doc.add_paragraph("").alignment(Alignment::Center);
+        p.add_run(&f.get("subhead", "[Catchy one-liner]"))
+            .italic(true)
+            .size(15.0);
+    }
     doc.add_paragraph("");
-    for (label, key, dflt) in [("When", "when", "[Date · Time]"), ("Where", "where", "[Venue · Address]"), ("Details", "details", "[What to expect]")] {
+    for (label, key, dflt) in [
+        ("When", "when", "[Date · Time]"),
+        ("Where", "where", "[Venue · Address]"),
+        ("Details", "details", "[What to expect]"),
+    ] {
         let mut p = doc.add_paragraph("").alignment(Alignment::Center);
         p.add_run(&format!("{}: ", label)).bold(true).color(&accent);
         p.add_run(&f.get(key, dflt));
     }
     doc.add_paragraph("");
-    { let mut p = doc.add_paragraph("").alignment(Alignment::Center); p.add_run(&f.get("cta", "RSVP at [email / link]")).bold(true).size(14.0).color(&accent); }
+    {
+        let mut p = doc.add_paragraph("").alignment(Alignment::Center);
+        p.add_run(&f.get("cta", "RSVP at [email / link]"))
+            .bold(true)
+            .size(14.0)
+            .color(&accent);
+    }
 }
 
 /// Contract / agreement: title, parties, numbered clauses, signature blocks.
 pub fn create_contract(doc: &mut Document, f: &Fields) {
     let accent = f.accent("1A1A1A");
-    business_base(doc, f, "Agreement", &accent, "Times New Roman", "Times New Roman");
+    business_base(
+        doc,
+        f,
+        "Agreement",
+        &accent,
+        "Times New Roman",
+        "Times New Roman",
+    );
     doc.set_footer_page_number();
-    doc.add_paragraph(&f.get("title", "SERVICE AGREEMENT").to_uppercase()).style("Heading1").alignment(Alignment::Center);
-    doc.add_paragraph(&format!("This agreement is made on {} between {} (\"Provider\") and {} (\"Client\").",
-        f.get("date", "[Date]"), f.get("party_a", "[Party A]"), f.get("party_b", "[Party B]")));
+    doc.add_paragraph(&f.get("title", "SERVICE AGREEMENT").to_uppercase())
+        .style("Heading1")
+        .alignment(Alignment::Center);
+    doc.add_paragraph(&format!(
+        "This agreement is made on {} between {} (\"Provider\") and {} (\"Client\").",
+        f.get("date", "[Date]"),
+        f.get("party_a", "[Party A]"),
+        f.get("party_b", "[Party B]")
+    ));
     doc.add_paragraph("");
     let clauses = f.arr("clauses");
     if clauses.is_empty() {
-        for (h, b) in [("Scope", "[Describe the services provided.]"), ("Payment", "[Fees, schedule, and method.]"),
-            ("Term & Termination", "[Duration and how either party may end the agreement.]"),
-            ("Confidentiality", "[Treatment of confidential information.]"),
-            ("Governing Law", "[Jurisdiction whose laws apply.]")] {
+        for (h, b) in [
+            ("Scope", "[Describe the services provided.]"),
+            ("Payment", "[Fees, schedule, and method.]"),
+            (
+                "Term & Termination",
+                "[Duration and how either party may end the agreement.]",
+            ),
+            (
+                "Confidentiality",
+                "[Treatment of confidential information.]",
+            ),
+            ("Governing Law", "[Jurisdiction whose laws apply.]"),
+        ] {
             doc.add_numbered_list_item(&format!("{}. {}", h, b), 0);
         }
     } else {
         for c in clauses {
             let title = jstr(c, "title", "");
             let body = jstr(c, "body", "");
-            let line = if title.is_empty() { body.to_string() } else { format!("{}. {}", title, body) };
+            let line = if title.is_empty() {
+                body.to_string()
+            } else {
+                format!("{}. {}", title, body)
+            };
             doc.add_numbered_list_item(&line, 0);
         }
     }
     doc.add_paragraph("");
-    let mut t = doc.add_table(2, 2).column_widths(&[Length::inches(3.25), Length::inches(3.25)]);
-    cell_text(&mut t, 0, 0, "_______________________", Alignment::Left, false);
-    cell_text(&mut t, 0, 1, "_______________________", Alignment::Left, false);
-    cell_text(&mut t, 1, 0, &f.get("party_a", "Provider"), Alignment::Left, true);
-    cell_text(&mut t, 1, 1, &f.get("party_b", "Client"), Alignment::Left, true);
+    let mut t = doc
+        .add_table(2, 2)
+        .column_widths(&[Length::inches(3.25), Length::inches(3.25)]);
+    cell_text(
+        &mut t,
+        0,
+        0,
+        "_______________________",
+        Alignment::Left,
+        false,
+    );
+    cell_text(
+        &mut t,
+        0,
+        1,
+        "_______________________",
+        Alignment::Left,
+        false,
+    );
+    cell_text(
+        &mut t,
+        1,
+        0,
+        &f.get("party_a", "Provider"),
+        Alignment::Left,
+        true,
+    );
+    cell_text(
+        &mut t,
+        1,
+        1,
+        &f.get("party_b", "Client"),
+        Alignment::Left,
+        true,
+    );
 }
 
 /// Meeting minutes: meta block, attendees, ruled discussion, and action items.
 pub fn create_meeting_minutes(doc: &mut Document, f: &Fields) {
     let accent = f.accent("2C3E50");
     business_base(doc, f, "Minutes", &accent, "Calibri", "Calibri");
-    doc.add_paragraph(&f.get("title", "MEETING MINUTES").to_uppercase()).style("Heading1").alignment(Alignment::Center);
-    let mut t = doc.add_table(3, 2).column_widths(&[Length::inches(1.2), Length::inches(5.3)]);
-    let meta = [("Date", f.get("date", "[Date]")), ("Time", f.get("time", "[Time]")), ("Location", f.get("location", "[Location]"))];
+    doc.add_paragraph(&f.get("title", "MEETING MINUTES").to_uppercase())
+        .style("Heading1")
+        .alignment(Alignment::Center);
+    let mut t = doc
+        .add_table(3, 2)
+        .column_widths(&[Length::inches(1.2), Length::inches(5.3)]);
+    let meta = [
+        ("Date", f.get("date", "[Date]")),
+        ("Time", f.get("time", "[Time]")),
+        ("Location", f.get("location", "[Location]")),
+    ];
     for (i, (k, v)) in meta.iter().enumerate() {
         cell_text(&mut t, i, 0, k, Alignment::Left, true);
         cell_text(&mut t, i, 1, v, Alignment::Left, false);
@@ -1066,7 +1672,9 @@ pub fn create_meeting_minutes(doc: &mut Document, f: &Fields) {
         doc.add_bullet_list_item("[Owner — task — due date]", 0);
     } else {
         for a in actions {
-            if let Some(s) = a.as_str() { doc.add_bullet_list_item(s, 0); }
+            if let Some(s) = a.as_str() {
+                doc.add_bullet_list_item(s, 0);
+            }
         }
     }
 }
@@ -1076,15 +1684,31 @@ pub fn create_sign_in_sheet(doc: &mut Document, f: &Fields) {
     use zavora_docx::BorderStyle;
     let accent = f.accent("34495E");
     business_base(doc, f, "Sign-In Sheet", &accent, "Calibri", "Calibri");
-    doc.add_paragraph(&f.get("title", "SIGN-IN SHEET").to_uppercase()).style("Heading1").alignment(Alignment::Center);
-    doc.add_paragraph(&format!("{} · {}", f.get("event", "[Event]"), f.get("date", "[Date]"))).alignment(Alignment::Center);
+    doc.add_paragraph(&f.get("title", "SIGN-IN SHEET").to_uppercase())
+        .style("Heading1")
+        .alignment(Alignment::Center);
+    doc.add_paragraph(&format!(
+        "{} · {}",
+        f.get("event", "[Event]"),
+        f.get("date", "[Date]")
+    ))
+    .alignment(Alignment::Center);
     doc.add_paragraph("");
     let rows = 16usize;
-    let mut t = doc.add_table(rows, 4)
+    let mut t = doc
+        .add_table(rows, 4)
         .borders(BorderStyle::Single, 4, "B0B0B0")
-        .column_widths(&[Length::inches(2.2), Length::inches(2.0), Length::inches(1.0), Length::inches(1.3)]);
+        .column_widths(&[
+            Length::inches(2.2),
+            Length::inches(2.0),
+            Length::inches(1.0),
+            Length::inches(1.3),
+        ]);
     t.header_row_style(&accent, "FFFFFF");
-    for (c, h) in ["Name", "Organization", "Time", "Signature"].iter().enumerate() {
+    for (c, h) in ["Name", "Organization", "Time", "Signature"]
+        .iter()
+        .enumerate()
+    {
         cell_text(&mut t, 0, c, h, Alignment::Left, true);
     }
 }
@@ -1094,17 +1718,49 @@ pub fn create_business_plan(doc: &mut Document, f: &Fields) {
     let accent = f.accent("6C3483");
     business_base(doc, f, "Business Plan", &accent, "Calibri", "Cambria");
     doc.set_footer_page_number();
-    doc.add_paragraph(&f.get("company", "COMPANY NAME").to_uppercase()).style("Heading1").alignment(Alignment::Center);
-    doc.add_paragraph(&f.get("tagline", "Business Plan")).alignment(Alignment::Center);
-    doc.add_paragraph(&f.get("date", "[Date]")).alignment(Alignment::Center);
+    doc.add_paragraph(&f.get("company", "COMPANY NAME").to_uppercase())
+        .style("Heading1")
+        .alignment(Alignment::Center);
+    doc.add_paragraph(&f.get("tagline", "Business Plan"))
+        .alignment(Alignment::Center);
+    doc.add_paragraph(&f.get("date", "[Date]"))
+        .alignment(Alignment::Center);
     for (h, key, dflt) in [
-        ("Executive Summary", "summary", "[The business in brief — what, who, and why now.]"),
-        ("Company Description", "description", "[Mission, structure, and offering.]"),
-        ("Market Analysis", "market", "[Target market, size, and competition.]"),
-        ("Organization & Management", "organization", "[Team and roles.]"),
-        ("Products & Services", "products", "[What you sell and the value.]"),
-        ("Marketing & Sales", "marketing", "[How you reach and convert customers.]"),
-        ("Financial Plan", "financials", "[Projections, funding needs, and milestones.]"),
+        (
+            "Executive Summary",
+            "summary",
+            "[The business in brief — what, who, and why now.]",
+        ),
+        (
+            "Company Description",
+            "description",
+            "[Mission, structure, and offering.]",
+        ),
+        (
+            "Market Analysis",
+            "market",
+            "[Target market, size, and competition.]",
+        ),
+        (
+            "Organization & Management",
+            "organization",
+            "[Team and roles.]",
+        ),
+        (
+            "Products & Services",
+            "products",
+            "[What you sell and the value.]",
+        ),
+        (
+            "Marketing & Sales",
+            "marketing",
+            "[How you reach and convert customers.]",
+        ),
+        (
+            "Financial Plan",
+            "financials",
+            "[Projections, funding needs, and milestones.]",
+        ),
     ] {
         section_rule(doc, h, &accent);
         doc.add_paragraph(&f.get(key, dflt));
@@ -1162,24 +1818,33 @@ pub fn template_catalog() -> Vec<(&'static str, &'static str, &'static str)> {
 /// Syntax highlighting colors for common tokens.
 struct SyntaxColors;
 impl SyntaxColors {
-    const KEYWORD: &str = "0000FF";    // blue
-    const STRING: &str = "A31515";     // dark red
-    const COMMENT: &str = "008000";    // green
-    const FUNCTION: &str = "795E26";   // brown
-    const TYPE: &str = "267F99";       // teal
-    const NUMBER: &str = "098658";     // dark green
-    const MACRO: &str = "AF00DB";      // purple
+    const KEYWORD: &str = "0000FF"; // blue
+    const STRING: &str = "A31515"; // dark red
+    const COMMENT: &str = "008000"; // green
+    const TYPE: &str = "267F99"; // teal
+    const NUMBER: &str = "098658"; // dark green
+    const MACRO: &str = "AF00DB"; // purple
 }
 
 /// Simple token types for syntax highlighting.
-enum TokenKind { Keyword, String, Comment, Function, Type, Number, Macro, Plain }
+enum TokenKind {
+    Keyword,
+    String,
+    Comment,
+    Type,
+    Number,
+    Macro,
+    Plain,
+}
 
 /// Tokenize a line of Rust code (simple heuristic-based).
 fn tokenize_rust(line: &str) -> Vec<(TokenKind, String)> {
     let mut tokens = Vec::new();
-    let keywords = ["use", "fn", "let", "mut", "pub", "struct", "impl", "async", "await",
-        "match", "if", "else", "for", "in", "return", "self", "Self", "crate", "mod",
-        "true", "false", "Ok", "Err", "Some", "None", "where", "trait", "enum", "type"];
+    let keywords = [
+        "use", "fn", "let", "mut", "pub", "struct", "impl", "async", "await", "match", "if",
+        "else", "for", "in", "return", "self", "Self", "crate", "mod", "true", "false", "Ok",
+        "Err", "Some", "None", "where", "trait", "enum", "type",
+    ];
 
     if line.trim_start().starts_with("//") {
         tokens.push((TokenKind::Comment, line.to_string()));
@@ -1199,7 +1864,9 @@ fn tokenize_rust(line: &str) -> Vec<(TokenKind, String)> {
             s.push(chars.next().unwrap());
             while let Some(&c) = chars.peek() {
                 s.push(chars.next().unwrap());
-                if c == '"' && !s.ends_with("\\\"") { break; }
+                if c == '"' && !s.ends_with("\\\"") {
+                    break;
+                }
             }
             tokens.push((TokenKind::String, s));
         } else if ch == '#' {
@@ -1209,7 +1876,10 @@ fn tokenize_rust(line: &str) -> Vec<(TokenKind, String)> {
             }
             let mut s = String::new();
             while let Some(&c) = chars.peek() {
-                if c == ']' { s.push(chars.next().unwrap()); break; }
+                if c == ']' {
+                    s.push(chars.next().unwrap());
+                    break;
+                }
                 s.push(chars.next().unwrap());
             }
             tokens.push((TokenKind::Macro, s));
@@ -1230,10 +1900,20 @@ fn tokenize_rust(line: &str) -> Vec<(TokenKind, String)> {
 }
 
 fn classify_word(word: &str, keywords: &[&str]) -> TokenKind {
-    if keywords.contains(&word) { TokenKind::Keyword }
-    else if word.chars().next().map(|c| c.is_uppercase()).unwrap_or(false) { TokenKind::Type }
-    else if word.chars().all(|c| c.is_ascii_digit() || c == '.') { TokenKind::Number }
-    else { TokenKind::Plain }
+    if keywords.contains(&word) {
+        TokenKind::Keyword
+    } else if word
+        .chars()
+        .next()
+        .map(|c| c.is_uppercase())
+        .unwrap_or(false)
+    {
+        TokenKind::Type
+    } else if word.chars().all(|c| c.is_ascii_digit() || c == '.') {
+        TokenKind::Number
+    } else {
+        TokenKind::Plain
+    }
 }
 
 fn token_color(kind: &TokenKind) -> Option<&'static str> {
@@ -1241,7 +1921,6 @@ fn token_color(kind: &TokenKind) -> Option<&'static str> {
         TokenKind::Keyword => Some(SyntaxColors::KEYWORD),
         TokenKind::String => Some(SyntaxColors::STRING),
         TokenKind::Comment => Some(SyntaxColors::COMMENT),
-        TokenKind::Function => Some(SyntaxColors::FUNCTION),
         TokenKind::Type => Some(SyntaxColors::TYPE),
         TokenKind::Number => Some(SyntaxColors::NUMBER),
         TokenKind::Macro => Some(SyntaxColors::MACRO),
@@ -1250,13 +1929,22 @@ fn token_color(kind: &TokenKind) -> Option<&'static str> {
 }
 
 /// Insert a syntax-highlighted code block with gray background.
-pub fn insert_code_block(doc: &mut Document, index: usize, code: &str, _language: Option<&str>) -> usize {
+pub fn insert_code_block(
+    doc: &mut Document,
+    index: usize,
+    code: &str,
+    language: Option<&str>,
+) -> usize {
     let lines: Vec<&str> = code.lines().collect();
     let count = lines.len();
+    let highlight_rust = language.is_some_and(|language| {
+        language.eq_ignore_ascii_case("rust") || language.eq_ignore_ascii_case("rs")
+    });
 
     for (i, line) in lines.iter().enumerate() {
         let mut para = doc.insert_paragraph(index + i, "");
-        para = para.shading("F5F5F5")
+        para = para
+            .shading("F5F5F5")
             .indent_left(Length::inches(0.2))
             .indent_right(Length::inches(0.2))
             .line_spacing_multiple(1.0)
@@ -1269,9 +1957,18 @@ pub fn insert_code_block(doc: &mut Document, index: usize, code: &str, _language
             para = para.space_after(Length::pt(8.0));
         }
 
-        // Single run per line — clean monospace rendering
-        para.add_run(if line.is_empty() { " " } else { line })
-            .font("Courier New").size(9.0);
+        if highlight_rust && !line.is_empty() {
+            for (kind, token) in tokenize_rust(line) {
+                let run = para.add_run(&token).font("Courier New").size(9.0);
+                if let Some(color) = token_color(&kind) {
+                    run.color(color);
+                }
+            }
+        } else {
+            para.add_run(if line.is_empty() { " " } else { line })
+                .font("Courier New")
+                .size(9.0);
+        }
     }
     count
 }
@@ -1336,7 +2033,10 @@ pub fn insert_chapter_opening(doc: &mut Document, index: usize, text: &str, font
     for (i, c) in rest.char_indices() {
         if c == ' ' {
             lead_words += 1;
-            if lead_words == 3 { split = i; break; }
+            if lead_words == 3 {
+                split = i;
+                break;
+            }
         }
     }
     let (lead, tail) = rest.split_at(split);
@@ -1348,13 +2048,26 @@ pub fn insert_chapter_opening(doc: &mut Document, index: usize, text: &str, font
         body.add_run(lead).font(font).small_caps(true);
     }
     if !tail.is_empty() {
-        body.add_run(&tail).font(font);
+        body.add_run(tail).font(font);
     }
 }
 
 #[cfg(test)]
 mod logo_tests {
-    use super::{image_dims, load_logo};
+    use super::{image_dims, load_logo, token_color, tokenize_rust, SyntaxColors, TokenKind};
+
+    #[test]
+    fn rust_syntax_tokens_receive_expected_colours() {
+        let tokens = tokenize_rust("fn main() { let value = \"hello\"; }");
+        assert!(tokens
+            .iter()
+            .any(|(kind, token)| matches!(kind, TokenKind::Keyword) && token == "fn"));
+        assert!(tokens.iter().any(|(kind, token)| {
+            matches!(kind, TokenKind::String)
+                && token == "\"hello\""
+                && token_color(kind) == Some(SyntaxColors::STRING)
+        }));
+    }
 
     #[test]
     fn parses_png_dimensions() {
@@ -1394,8 +2107,16 @@ mod logo_tests {
         let v = serde_json::json!({"accent": "C0392B"});
         assert_eq!(Fields::new(&v).accent("2980B9"), "C0392B");
         // Invalid (bad length / non-hex / absent) all fall back to the default.
-        for bad in [serde_json::json!({"accent": "blue"}), serde_json::json!({"accent": "12345"}), serde_json::json!({})] {
-            assert_eq!(Fields::new(&bad).accent("2980B9"), "2980B9", "should default: {bad}");
+        for bad in [
+            serde_json::json!({"accent": "blue"}),
+            serde_json::json!({"accent": "12345"}),
+            serde_json::json!({}),
+        ] {
+            assert_eq!(
+                Fields::new(&bad).accent("2980B9"),
+                "2980B9",
+                "should default: {bad}"
+            );
         }
     }
 }

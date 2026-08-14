@@ -5,7 +5,7 @@
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 [![ADK-Rust Enterprise](https://img.shields.io/badge/ADK--Rust-Enterprise-purple.svg)](https://enterprise.adk-rust.com)
 
-80 MCP tools for creating, reading, editing, formatting, and converting Microsoft Word (.docx) documents — plus KDP book layouts and a library of 21 parameterized business templates. Pure Rust, local-first, no Microsoft Office required.
+88 MCP tools for creating, reading, editing, formatting, and converting Microsoft Word (.docx) documents — plus KDP book layouts and a library of 21 parameterized business templates. Pure Rust, local-first, no Microsoft Office required.
 
 ## Install
 
@@ -27,7 +27,7 @@ cargo install docx-mcp-server
 
 ## Highlights
 
-- **80 tools** spanning document lifecycle, reading, writing, formatting, tables, media, math/charts/shapes, and export to PDF / HTML / Markdown / plain text.
+- **88 tools** spanning document lifecycle, reading, writing, formatting, tables, media, math/charts/shapes, accessibility review, and export to PDF / PNG / HTML / Markdown / plain text.
 - **KDP book formats** — `create_document` accepts `kdp:technical`, `kdp:novel`, `kdp:cookbook`, `kdp:children`, `kdp:interior_design`, `kdp:encyclopedia`, `kdp:manga`.
 - **21 business templates** — publication-grade, fully parameterized via a `data` object (see below).
 - **Discovery** — `list_templates` returns every template's structured `data_fields` (name + type + item shape) and the universal `style_params`, so an agent can learn the schema programmatically.
@@ -85,7 +85,7 @@ The authoritative tool list with risk classes lives in [`mcp-server.toml`](mcp-s
 
 - **In-memory document store** — LRU eviction (100 docs) + TTL expiry (1 hour)
 - **UUID handles** — documents referenced by handle, not file path
-- **Pure Rust** — built on [`zavora-docx`](https://crates.io/crates/zavora-docx) for OOXML, layout, and PDF/HTML/Markdown rendering
+- **Pure Rust** — built on [`zavora-docx` 0.1.3](https://crates.io/crates/zavora-docx/0.1.3) for OOXML, layout, and PDF/PNG/HTML/Markdown rendering
 - **No system deps** — no LibreOffice, no Microsoft Office
 
 ## Example workflow

@@ -17,7 +17,11 @@ async fn tools_build_a_feature_rich_document() {
 
     // create
     let r = srv
-        .create_document(Parameters(CreateInput { title: Some("MCP".into()), format: None, data: None }))
+        .create_document(Parameters(CreateInput {
+            title: Some("MCP".into()),
+            format: None,
+            data: None,
+        }))
         .await;
     let handle = json(&r)["handle"].as_str().expect("handle").to_string();
 
@@ -89,7 +93,10 @@ async fn tools_build_a_feature_rich_document() {
             document_handle: handle.clone(),
             kind: "scatter".into(),
             categories: vec!["1".into(), "2".into()],
-            series: vec![ChartSeriesInput { name: "s".into(), values: vec![3.0, 6.0] }],
+            series: vec![ChartSeriesInput {
+                name: "s".into(),
+                values: vec![3.0, 6.0],
+            }],
             title: Some("XY".into()),
             width_inches: None,
             height_inches: None,
@@ -132,7 +139,9 @@ async fn tools_build_a_feature_rich_document() {
         .await;
     assert!(json(&r)["saved"].is_string(), "save failed: {r}");
 
-    let r = srv.open_document(Parameters(OpenInput { file_path: out_s })).await;
+    let r = srv
+        .open_document(Parameters(OpenInput { file_path: out_s }))
+        .await;
     assert!(json(&r)["handle"].is_string(), "reopen failed: {r}");
 
     let _ = std::fs::remove_file(&out);
@@ -141,8 +150,14 @@ async fn tools_build_a_feature_rich_document() {
 #[tokio::test]
 async fn unknown_chart_kind_is_rejected() {
     let srv = DocxServer::new();
-    let h = json(&srv.create_document(Parameters(CreateInput { title: None, format: None, data: None })).await)
-        ["handle"]
+    let h = json(
+        &srv.create_document(Parameters(CreateInput {
+            title: None,
+            format: None,
+            data: None,
+        }))
+        .await,
+    )["handle"]
         .as_str()
         .unwrap()
         .to_string();
@@ -162,7 +177,10 @@ async fn unknown_chart_kind_is_rejected() {
             label_color: None,
         }))
         .await;
-    assert!(json(&r)["error"].is_string(), "expected error for bogus kind: {r}");
+    assert!(
+        json(&r)["error"].is_string(),
+        "expected error for bogus kind: {r}"
+    );
 }
 
 #[tokio::test]
@@ -184,10 +202,15 @@ async fn business_template_fills_supplied_data() {
         .await;
     let handle = json(&r)["handle"].as_str().expect("handle").to_string();
     let r = srv
-        .to_plain_text(Parameters(ExportInput { document_handle: handle }))
+        .to_plain_text(Parameters(ExportInput {
+            document_handle: handle,
+        }))
         .await;
     let text = json(&r)["text"].as_str().expect("text").to_string();
-    assert!(text.contains("Northwind Studio"), "supplied company missing: {text}");
+    assert!(
+        text.contains("Northwind Studio"),
+        "supplied company missing: {text}"
+    );
     // 1×4500 + 12×350 = 8700 → in-table TOTAL is now reachable via plain text.
     assert!(text.contains("$8,700.00"), "computed total missing: {text}");
 }
@@ -211,26 +234,44 @@ async fn proposal_template_computes_total() {
         .await;
     let handle = json(&r)["handle"].as_str().expect("handle").to_string();
     let r = srv
-        .to_plain_text(Parameters(ExportInput { document_handle: handle }))
+        .to_plain_text(Parameters(ExportInput {
+            document_handle: handle,
+        }))
         .await;
     let text = json(&r)["text"].as_str().expect("text").to_string();
     // 6000 + 8×900 = 13200 → auto-summed deliverables total.
-    assert!(text.contains("$13,200.00"), "proposal total missing: {text}");
+    assert!(
+        text.contains("$13,200.00"),
+        "proposal total missing: {text}"
+    );
 }
 
 #[tokio::test]
 async fn priced_templates_share_total_logic() {
     let srv = DocxServer::new();
-    for (fmt, label) in [("business:quote", "$2,700.00"), ("business:receipt", "$2,700.00")] {
+    for (fmt, label) in [
+        ("business:quote", "$2,700.00"),
+        ("business:receipt", "$2,700.00"),
+    ] {
         let data = serde_json::json!({"items": [
             {"description": "Consulting", "qty": 10, "price": 150},
             {"description": "License", "qty": 1, "price": 1200}
         ]});
-        let r = srv.create_document(Parameters(CreateInput {
-            title: None, format: Some(fmt.into()), data: Some(data),
-        })).await;
+        let r = srv
+            .create_document(Parameters(CreateInput {
+                title: None,
+                format: Some(fmt.into()),
+                data: Some(data),
+            }))
+            .await;
         let h = json(&r)["handle"].as_str().expect("handle").to_string();
-        let text = json(&srv.to_plain_text(Parameters(ExportInput { document_handle: h })).await)["text"].as_str().unwrap().to_string();
+        let text = json(
+            &srv.to_plain_text(Parameters(ExportInput { document_handle: h }))
+                .await,
+        )["text"]
+            .as_str()
+            .unwrap()
+            .to_string();
         assert!(text.contains(label), "{fmt} total missing: {text}");
     }
 }
@@ -239,12 +280,25 @@ async fn priced_templates_share_total_logic() {
 async fn contract_renders_supplied_clauses() {
     let srv = DocxServer::new();
     let data = serde_json::json!({"clauses": [{"title": "Scope", "body": "Deliver a website."}]});
-    let r = srv.create_document(Parameters(CreateInput {
-        title: None, format: Some("business:contract".into()), data: Some(data),
-    })).await;
+    let r = srv
+        .create_document(Parameters(CreateInput {
+            title: None,
+            format: Some("business:contract".into()),
+            data: Some(data),
+        }))
+        .await;
     let h = json(&r)["handle"].as_str().expect("handle").to_string();
-    let text = json(&srv.to_plain_text(Parameters(ExportInput { document_handle: h })).await)["text"].as_str().unwrap().to_string();
-    assert!(text.contains("Deliver a website."), "clause missing: {text}");
+    let text = json(
+        &srv.to_plain_text(Parameters(ExportInput { document_handle: h }))
+            .await,
+    )["text"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    assert!(
+        text.contains("Deliver a website."),
+        "clause missing: {text}"
+    );
 }
 
 #[tokio::test]
@@ -256,47 +310,138 @@ async fn list_templates_returns_catalog() {
     assert_eq!(templates.len(), 21, "expected 21 business templates");
     let params = v["style_params"].as_array().expect("style_params array");
     let names: Vec<&str> = params.iter().map(|p| p["name"].as_str().unwrap()).collect();
-    for k in ["accent", "logo", "logo_align", "logo_height", "heading_font", "body_font"] {
+    for k in [
+        "accent",
+        "logo",
+        "logo_align",
+        "logo_height",
+        "heading_font",
+        "body_font",
+    ] {
         assert!(names.contains(&k), "style_params missing {k}: {names:?}");
     }
     // Every entry must carry a format, description, and data_keys.
     for t in templates {
-        assert!(t["format"].as_str().is_some_and(|s| s.starts_with("business:")), "bad format: {t}");
-        assert!(!t["description"].as_str().unwrap_or("").is_empty(), "empty description: {t}");
-        assert!(!t["data_keys"].as_str().unwrap_or("").is_empty(), "empty data_keys: {t}");
+        assert!(
+            t["format"]
+                .as_str()
+                .is_some_and(|s| s.starts_with("business:")),
+            "bad format: {t}"
+        );
+        assert!(
+            !t["description"].as_str().unwrap_or("").is_empty(),
+            "empty description: {t}"
+        );
+        assert!(
+            !t["data_keys"].as_str().unwrap_or("").is_empty(),
+            "empty data_keys: {t}"
+        );
         let df = t["data_fields"].as_array().expect("data_fields array");
         assert!(!df.is_empty(), "empty data_fields: {t}");
         for fld in df {
-            assert!(fld["name"].as_str().is_some_and(|s| !s.is_empty()), "field missing name: {t}");
-            assert!(matches!(fld["type"].as_str(), Some("text" | "array<string>" | "array<object>")), "bad field type: {fld}");
+            assert!(
+                fld["name"].as_str().is_some_and(|s| !s.is_empty()),
+                "field missing name: {t}"
+            );
+            assert!(
+                matches!(
+                    fld["type"].as_str(),
+                    Some("text" | "array<string>" | "array<object>")
+                ),
+                "bad field type: {fld}"
+            );
         }
     }
     // The invoice's items field must be a typed object array carrying its item keys.
-    let inv = templates.iter().find(|t| t["format"] == "business:invoice").expect("invoice");
-    let items = inv["data_fields"].as_array().unwrap().iter().find(|f| f["name"] == "items").expect("items field");
+    let inv = templates
+        .iter()
+        .find(|t| t["format"] == "business:invoice")
+        .expect("invoice");
+    let items = inv["data_fields"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|f| f["name"] == "items")
+        .expect("items field");
     assert_eq!(items["type"], "array<object>");
-    assert!(items["item_keys"].as_array().unwrap().iter().any(|k| k == "description"), "items missing keys");
+    assert!(
+        items["item_keys"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|k| k == "description"),
+        "items missing keys"
+    );
 }
-
 
 #[tokio::test]
 async fn tracked_changes_author_list_resolve() {
     let srv = DocxServer::new();
-    let h = json(&srv.create_document(Parameters(CreateInput { title: Some("TC".into()), format: None, data: None })).await)
-        ["handle"].as_str().unwrap().to_string();
-    srv.insert_paragraph(Parameters(InsertParaInput { document_handle: h.clone(), index: 0, text: "base".into(), style: None, page_break_before: None })).await;
+    let h = json(
+        &srv.create_document(Parameters(CreateInput {
+            title: Some("TC".into()),
+            format: None,
+            data: None,
+        }))
+        .await,
+    )["handle"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    srv.insert_paragraph(Parameters(InsertParaInput {
+        document_handle: h.clone(),
+        index: 0,
+        text: "base".into(),
+        style: None,
+        page_break_before: None,
+    }))
+    .await;
 
     // Author one insertion + one deletion as the agent.
-    srv.add_tracked_insert(Parameters(TrackedInsertInput { document_handle: h.clone(), paragraph_index: 0, text: "INS".into(), author: "Agent".into() })).await;
-    srv.add_tracked_delete(Parameters(TrackedDeleteInput { document_handle: h.clone(), paragraph_index: 0, text: "DEL".into(), author: "Agent".into() })).await;
+    srv.add_tracked_insert(Parameters(TrackedInsertInput {
+        document_handle: h.clone(),
+        paragraph_index: 0,
+        text: "INS".into(),
+        author: "Agent".into(),
+    }))
+    .await;
+    srv.add_tracked_delete(Parameters(TrackedDeleteInput {
+        document_handle: h.clone(),
+        paragraph_index: 0,
+        text: "DEL".into(),
+        author: "Agent".into(),
+    }))
+    .await;
 
     // List: 2 changes, both by Agent.
-    let listed = json(&srv.list_tracked_changes(Parameters(HandleInput { document_handle: h.clone() })).await);
+    let listed = json(
+        &srv.list_tracked_changes(Parameters(HandleInput {
+            document_handle: h.clone(),
+        }))
+        .await,
+    );
     assert_eq!(listed["count"], 2);
-    assert!(listed["changes"].as_array().unwrap().iter().all(|c| c["author"] == "Agent"));
+    assert!(listed["changes"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .all(|c| c["author"] == "Agent"));
 
     // Accept all → resolved 2, none remain.
-    let r = json(&srv.resolve_tracked_changes(Parameters(ResolveTrackedInput { document_handle: h.clone(), accept: true, change_id: None })).await);
+    let r = json(
+        &srv.resolve_tracked_changes(Parameters(ResolveTrackedInput {
+            document_handle: h.clone(),
+            accept: true,
+            change_id: None,
+        }))
+        .await,
+    );
     assert_eq!(r["resolved"], 2);
-    assert_eq!(json(&srv.list_tracked_changes(Parameters(HandleInput { document_handle: h })).await)["count"], 0);
+    assert_eq!(
+        json(
+            &srv.list_tracked_changes(Parameters(HandleInput { document_handle: h }))
+                .await
+        )["count"],
+        0
+    );
 }

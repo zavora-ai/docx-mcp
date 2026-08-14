@@ -3,7 +3,7 @@ name = "docx-mcp-server"
 version = "2.2.0"
 edition = "2021"
 rust-version = "1.94.1"
-description = "DOCX MCP Server — 80 tools for creating, reading, editing, and converting Word documents, with PDF export, KDP book layouts, and parameterized business templates"
+description = "DOCX MCP Server — 88 tools for creating, reading, editing, and converting Word documents, with PDF export, KDP book layouts, and parameterized business templates"
 license = "Apache-2.0"
 repository = "https://github.com/zavora-ai/docx-mcp"
 homepage = "https://zavora.ai"
@@ -15,7 +15,7 @@ exclude = [".cargo/"]
 [dependencies]
 rmcp = { version = "3.1.2", features = ["server", "transport-io", "macros"] }
 adk-mcp-sdk = { version = "0.2.0", git = "https://github.com/zavora-ai/adk-mcp-sdk.git", rev = "4dac4301441a8a51a042fd66cc1798f0ec3e3f55" }
-zavora-docx = "0.1"
+zavora-docx = "0.1.3"
 tokio = { version = "1", features = ["full"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
