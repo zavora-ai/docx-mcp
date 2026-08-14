@@ -5,7 +5,7 @@
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 [![ADK-Rust Enterprise](https://img.shields.io/badge/ADK--Rust-Enterprise-purple.svg)](https://enterprise.adk-rust.com)
 
-80 MCP tools for creating, reading, editing, formatting, and converting Microsoft Word (.docx) documents — plus KDP book layouts and a library of 21 parameterized business templates. Pure Rust, local-first, no Microsoft Office required.
+88 MCP tools for creating, reading, editing, formatting, and converting Microsoft Word (.docx) documents — plus KDP book layouts and a library of 21 parameterized business templates. Pure Rust, local-first, no Microsoft Office required.
 
 ## Install
 
@@ -27,7 +27,7 @@ cargo install docx-mcp-server
 
 ## Highlights
 
-- **80 tools** spanning document lifecycle, reading, writing, formatting, tables, media, math/charts/shapes, and export to PDF / HTML / Markdown / plain text.
+- **88 tools** spanning document lifecycle, reading, writing, formatting, tables, media, math/charts/shapes, accessibility review, and export to PDF / PNG / HTML / Markdown / plain text.
 - **KDP book formats** — `create_document` accepts `kdp:technical`, `kdp:novel`, `kdp:cookbook`, `kdp:children`, `kdp:interior_design`, `kdp:encyclopedia`, `kdp:manga`.
 - **21 business templates** — publication-grade, fully parameterized via a `data` object (see below).
 - **Discovery** — `list_templates` returns every template's structured `data_fields` (name + type + item shape) and the universal `style_params`, so an agent can learn the schema programmatically.
@@ -85,7 +85,7 @@ The authoritative tool list with risk classes lives in [`mcp-server.toml`](mcp-s
 
 - **In-memory document store** — LRU eviction (100 docs) + TTL expiry (1 hour)
 - **UUID handles** — documents referenced by handle, not file path
-- **Pure Rust** — built on [`zavora-docx`](https://crates.io/crates/zavora-docx) for OOXML, layout, and PDF/HTML/Markdown rendering
+- **Pure Rust** — built on [`zavora-docx` 0.1.3](https://crates.io/crates/zavora-docx/0.1.3) for OOXML, layout, and PDF/PNG/HTML/Markdown rendering
 - **No system deps** — no LibreOffice, no Microsoft Office
 
 ## Example workflow
@@ -113,4 +113,29 @@ Part of the [ADK-Rust Enterprise](https://enterprise.adk-rust.com) MCP server ec
 
 ## rmcp and MCP compatibility
 
-This server is built with [`rmcp` 3.1.2](https://github.com/modelcontextprotocol/rust-sdk/releases/tag/rmcp-v3.1.2) and requires Rust 1.88 or newer. The rmcp 3 rollout retains legacy MCP initialization compatibility and targets MCP protocol revisions `2025-11-25` and `2026-07-28`.
+This server is built with [`rmcp` 3.1.2](https://github.com/modelcontextprotocol/rust-sdk/releases/tag/rmcp-v3.1.2) and requires Rust 1.94.1 or newer. The rmcp 3 rollout retains legacy MCP initialization compatibility and targets MCP protocol revisions `2025-11-25` and `2026-07-28`.
+
+## MCP 2026-07-28 rollout (P4 workflow/business)
+
+This server uses `rmcp` 3.1.2 and `adk-mcp-sdk` 0.2 with a minimum supported
+Rust version of **1.94.1**. It accepts stateless MCP 2026 requests with
+per-request protocol, client identity, and capability metadata while retaining
+the legacy MCP 2025-11-25 initialize flow for ordinary tools.
+
+- **Tasks:** `insert_run`, `render_page`
+- **MRTR approvals:** None; this server exposes no manifest-classified protected operations.
+- **Discovery and routing:** rmcp serves on-demand discovery and validates the
+  per-request protocol envelope; HTTP deployments can route with `Mcp-Method`
+  and `Mcp-Name`. The packaged binary currently uses stdio.
+- **Caching:** `tools/list` returns a public `ttlMs` of 60,000 for MCP 2026;
+  rmcp omits the cache fields for legacy clients.
+- **Deprecated extensions:** this server does not add new Roots, Sampling, or
+  dynamic client-registration dependencies.
+
+Protected tools require `MCP_REQUEST_STATE_KEY` with at least 32 high-entropy
+bytes. All replicas must share that key so sealed approval state can resume on
+another instance. Approval state is bound to the client identity, tool, and
+arguments and expires after two minutes. Missing identity, invalid state,
+rejection, or legacy protocol use fails closed. Task records are process-local
+for the current stdio runtime; use a durable task store before deploying the
+server behind scale-to-zero HTTP infrastructure.
