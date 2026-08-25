@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.2.1] - 2026-08-25
+
+### Security
+
+- Upgraded the bundled `zavora-docx` engine to 0.1.4, closing the known
+  `quick-xml` denial-of-service advisories while preserving escaped metadata and
+  entity references.
+
 ## [2.2.0] - 2026-08-14
 
 ### Added

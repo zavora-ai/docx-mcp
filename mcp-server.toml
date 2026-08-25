@@ -1,6 +1,6 @@
 server_id = "docx_mcp"
 display_name = "Docx Mcp"
-version = "2.2.0"
+version = "2.2.1"
 domain = "documents"
 sdk_version = "0.2.0"
 risk_level = "high"

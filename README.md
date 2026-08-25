@@ -85,7 +85,7 @@ The authoritative tool list with risk classes lives in [`mcp-server.toml`](mcp-s
 
 - **In-memory document store** — LRU eviction (100 docs) + TTL expiry (1 hour)
 - **UUID handles** — documents referenced by handle, not file path
-- **Pure Rust** — built on [`zavora-docx` 0.1.3](https://crates.io/crates/zavora-docx/0.1.3) for OOXML, layout, and PDF/PNG/HTML/Markdown rendering
+- **Pure Rust** — built on [`zavora-docx` 0.1.4](https://crates.io/crates/zavora-docx/0.1.4) for OOXML, layout, and PDF/PNG/HTML/Markdown rendering
 - **No system deps** — no LibreOffice, no Microsoft Office
 
 ## Example workflow
