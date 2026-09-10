@@ -1127,9 +1127,13 @@ impl DocxServer {
             self.store,
             input.document_handle,
             |doc: &mut zavora_docx::Document| {
-                doc.insert_table(input.index, input.rows, input.cols);
-                serde_json::json!({"index": input.index, "rows": input.rows, "cols": input.cols})
-                    .to_string()
+                if input.rows.saturating_mul(input.cols) > 50_000 || input.cols > 1000 {
+                    serde_json::json!({"error": "TABLE_TOO_LARGE", "message": "rows*cols must be <= 50000 and cols <= 1000"}).to_string()
+                } else {
+                    doc.insert_table(input.index, input.rows, input.cols);
+                    serde_json::json!({"index": input.index, "rows": input.rows, "cols": input.cols})
+                        .to_string()
+                }
             }
         )
     }
@@ -1925,6 +1929,9 @@ impl DocxServer {
             |doc: &mut zavora_docx::Document| {
                 let cols = input.headers.len();
                 let rows = input.rows.len() + 1; // +1 for header
+                if rows.saturating_mul(cols) > 50_000 || cols > 1000 {
+                    return serde_json::json!({"error": "TABLE_TOO_LARGE", "message": "rows*cols must be <= 50000 and cols <= 1000"}).to_string();
+                }
                 let mut table = doc.insert_table(input.index, rows, cols);
                 // Set headers
                 for (c, header) in input.headers.iter().enumerate() {
@@ -1964,15 +1971,20 @@ impl DocxServer {
                                 cell.grid_span(input.span as u32);
                             }
                         } else {
-                            // vertical merge: restart on first cell, continue on subsequent
-                            for r in 0..input.span {
-                                if let Some(cell) = table.cell(input.start_row + r, input.start_col)
+                            // vertical merge: restart on first cell, continue on subsequent.
+                            // Stop as soon as we run past the table (None) so an absurd span
+                            // does not spin; saturating_add guards against index overflow.
+                            for r in 0..input.span.min(100_000) {
+                                match table.cell(input.start_row.saturating_add(r), input.start_col)
                                 {
-                                    if r == 0 {
-                                        cell.v_merge_restart();
-                                    } else {
-                                        cell.v_merge_continue();
+                                    Some(cell) => {
+                                        if r == 0 {
+                                            cell.v_merge_restart();
+                                        } else {
+                                            cell.v_merge_continue();
+                                        }
                                     }
+                                    None => break,
                                 }
                             }
                         }
@@ -2185,7 +2197,7 @@ impl DocxServer {
             self.store,
             input.document_handle,
             |doc: &mut zavora_docx::Document| {
-                let dpi = input.dpi.unwrap_or(150.0);
+                let dpi = input.dpi.unwrap_or(150.0).clamp(1.0, 600.0);
                 match doc.render_page_to_png(input.page_index, dpi) {
                 Ok(Some(png_data)) => {
                     match std::fs::write(&input.output_path, &png_data) {
